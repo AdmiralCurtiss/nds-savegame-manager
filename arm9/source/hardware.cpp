@@ -29,12 +29,14 @@
 #include <nds/arm9/console.h>
 #include <sys/dir.h>
 #include <sys/unistd.h>
+#include <dswifi9.h>
 
 #include <stdio.h>
 #include <algorithm>
 
 #include "display.h"
 #include "dsCard.h"
+#include "ftplib.h"
 #include "gba.h"
 
 #include "hardware.h"
@@ -49,6 +51,11 @@ uint32 boot;
 
 bool flash_card = true; // the homebrew will always start with a FC inserted
 bool with_infrared = false; // ... which does not have an IR device
+
+extern char ftp_ip[16];
+extern char ftp_user[64];
+extern char ftp_pass[64];
+extern int ftp_port;
 
 u8 data[0x8000];
 
@@ -134,6 +141,7 @@ void hwBackup3in1()
 	// Dump save and write it to NOR
 	chip_reset();
 	OpenNorWrite();
+	SetSerialMode();
 	displayPrintState("Writing save to NOR");
 	if (size < 15)
 		size_blocks = 1;
@@ -159,8 +167,6 @@ void hwBackup3in1()
 	WriteSram(0x0a000000, (u8*)&data2, sizeof(data2));
 	char txt[128];
 	sprintf(txt, "%.12s", &nds.gameTitle[0]);
-	//memcpy(&txt[0], &nds.gameTitle[0], 12);
-	//displayPrintState(txt);
 
 	displayMessage("Save has been written to 3in1.\nPlease power off and restart\nthis tool.");
 
@@ -175,8 +181,8 @@ void hwDump3in1(uint32 size, const char *gamename)
 
 	char path[256];
 	char fname[256] = "";
-	//fileSelect("/", path, fname/*, true*/);
-	//if (!fname[0]) {
+	fileSelect("/", path, fname, 0, true, false);
+	if (!fname[0]) {
 		uint32 cnt = 0;
 		sprintf(fname, "/%s.%i.sav", gamename, cnt);
 		while (fileExists(fname)) {
@@ -188,14 +194,14 @@ void hwDump3in1(uint32 size, const char *gamename)
 			}
 			sprintf(fname, "/%s.%i.sav", gamename, cnt);
 		}
-	//}
+	}
 	char fullpath[512];
-	//sprintf(fullpath, "%s/%s", path, fname);
-	sprintf(fullpath, "%s", fname);
-	displayMessage(fullpath);
-  
+	sprintf(fullpath, "%s/%s", path, fname);
+	//sprintf(fullpath, "%s", fname);
+	displayMessage(fname);
+
+	// TODO: add support for smaller files!
 	FILE *file = fopen(fullpath, "wb");
-	//u8 *data = (u8*)malloc(0x8000);
 	if (size < 15)
 		size_blocks = 1;
 	else
@@ -205,8 +211,6 @@ void hwDump3in1(uint32 size, const char *gamename)
 		u32 LEN = 0x8000;
 		ReadNorFlash(data, i << 15, LEN);
 		fwrite(data, 1, LEN, file);
-		//if (j != LEN)
-			//iprintf ("WRITE ERROR %i\n", errno);
 	}
 	//free(data);
 	fclose(file);
@@ -219,8 +223,9 @@ void hwRestore3in1()
 {
 	char path[256];
 	char fname[256];
+	memset(fname, 0, 256);
 	displayMessage("Please select a .sav file.");
-	fileSelect("/", path, fname);
+	fileSelect("/", path, fname, 0, false, false);
 	displayMessage("");
 	char msg[256];
 	sprintf(msg, "%s%s", path, fname);
@@ -310,11 +315,9 @@ void hwRestore3in1_b(uint32 size_file)
 	}
 	LEN = 1 << shift;
 	num_blocks = 1 << (size - shift);
-	//data = (u8*)malloc(LEN);
 
 	chip_reset();
 	OpenNorWrite();
-	SetSerialMode();
 	for (unsigned int i = 0; i < num_blocks; i++) {
 		if (i % (num_blocks >> 6) == 0)
 			displayProgressBar(i+1, num_blocks);
@@ -330,13 +333,224 @@ void hwRestore3in1_b(uint32 size_file)
 	while (1) {};
 }
 
+// ------------------------------------------------------------
 void hwErase()
 {
 	displayMessage("This will WIPE OUT your entire\nsave! ARE YOU SURE?\n\nPress R+up+Y to confim!");
 	while (!(keysCurrent() & (KEY_UP | KEY_R | KEY_Y))) {};
 	auxspi_erase();
 	displayMessage("Done! Your save is gone!");
-	while(0);
+	while(1);
+}
+
+// ------------------------------------------------------------
+void hwBackupFTP()
+{
+	netbuf *buf, *ndata;
+	int j;
+	static int jmax = 10;
+
+	// Dump save and write it to FTP server
+	// First: swap card
+	swap_cart();
+	displayPrintUpper();
+	uint8 size = auxspi_save_size_log_2();
+	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
+	uint8 type = auxspi_save_type();
+	if (size < 15)
+		size_blocks = 1;
+	else
+		size_blocks = 1 << (uint8(size) - 15);
+
+	// Second: connect to FTP server
+	displayPrintState("FTP: connecting to AP");
+	if (!Wifi_InitDefault(true)) {
+		displayPrintState("FTP: ERROR: AP not found");
+		while(1);
+	}
+	displayPrintState("FTP: connecting to FTP server");
+	char fullname[512];
+	sprintf(fullname, "%s:%i", ftp_ip, ftp_port);
+	j = 0;
+	while (!FtpConnect(fullname, &buf)) {
+		j++;
+		if (j >= jmax) {
+			displayPrintState("FTP: ERROR: FTP server missing");
+			while(1);
+		}
+		swiDelay(10000);
+	}
+	displayPrintState("FTP: login");
+	j = 0;
+	while (!FtpLogin(ftp_user, ftp_pass, buf)) {
+		j++;
+		if (j >= jmax) {
+			displayPrintState("FTP: ERROR: login failed");
+			while(1);
+		}
+		swiDelay(10000);
+	}
+	
+	char fdir[256] = "";
+	char fname[256] ="";
+	memset(fname, 0, 256);
+	displayMessage("Please select a file name to\noverwrite, or press L+R in a\nfolder to create a new file.");
+	displayPrintState("FTP: dir");
+	fileSelect("/", fdir, fname, buf, true, false);
+	bool newfile;
+	if (!fname[0])
+		newfile = true;
+	else
+		newfile = false;
+	
+	// Third: get a new target filename
+	FtpChdir(fdir, buf);
+	if (!fname[0]) {
+		displayMessage("Looking for an unused filename");
+		sNDSHeader nds;
+		cardReadHeader((u8*)&nds);
+		uint32 cnt = 0;
+		int tsize = 0;
+		sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
+		while (FtpSize(fname, &tsize, FTPLIB_IMAGE, buf) != 0) {
+			if (cnt < 65536)
+				cnt++;
+			else {
+				displayMessage("Unable to get a filename!\nThis means that you have more\nthan 65536 saves! (wow!)\nOops!");
+				while(1);
+			}
+			sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
+			displayPrintState(fname);
+		}
+	}
+	
+	// Fourth: dump save
+	displayPrintState("");
+	sprintf(fullname, "Writing file:\n%s%s", fdir, fname);
+	displayMessage(fullname);
+	FtpAccess(fname, FTPLIB_FILE_WRITE, FTPLIB_IMAGE, buf, &ndata);
+	u32 length = 0x200;
+	if (size < 9)
+		length = 1 << size;
+	for (int i = 0; i < (1 << (size - 9)); i++) {
+		displayProgressBar(i+1, (size_blocks << 6));
+		auxspi_read_data(i << 9, (u8*)&data[0], length, type);
+		int out;
+	    if ((out = FtpWrite((u8*)&data[0], length, ndata)) < length) {
+			char dings[512];
+			sprintf(dings, "Error: wrote %i, got %i", length, out);
+			displayPrintState(dings);
+			while(1);
+		}
+	}
+	FtpClose(ndata);
+	FtpQuit(ndata);
+	
+	Wifi_DisconnectAP();
+
+	displayMessage("Done! Please turn off your DS.");
+	while(1);
+}
+
+void hwRestoreFTP()
+{
+	netbuf *buf, *ndata;
+	int j;
+	static int jmax = 10;
+
+	// Dump save and write it to FTP server
+	// First: connect to FTP server
+	displayPrintState("FTP: connecting to AP");
+	if (!Wifi_InitDefault(true)) {
+		displayPrintState("FTP: ERROR: AP not found");
+		while(1);
+	}
+	displayPrintState("FTP: connecting to FTP server");
+	char fullname[512];
+	sprintf(fullname, "%s:%i", ftp_ip, ftp_port);
+	j = 0;
+	while (!FtpConnect(fullname, &buf)) {
+		j++;
+		if (j >= jmax) {
+			displayPrintState("FTP: ERROR: FTP server missing");
+			while(1);
+		}
+		swiDelay(10000);
+	}
+	displayPrintState("FTP: login");
+	j = 0;
+	while (!FtpLogin(ftp_user, ftp_pass, buf)) {
+		j++;
+		if (j >= jmax) {
+			displayPrintState("FTP: ERROR: login failed");
+			while(1);
+		}
+		swiDelay(10000);
+	}
+
+	// Second: select a filename
+	char fdir[256] = "";
+	char fname[256] ="";
+	memset(fname, 0, 256);
+	displayMessage("Please select a file name to\nrestore.");
+	displayPrintState("FTP: dir");
+	fileSelect("/", fdir, fname, buf, true, false);
+	/*char fn[512];
+	displayMessage(fname);
+	while(1);*/
+	
+	// Third: swap card
+	swap_cart();
+	displayPrintUpper();
+	uint8 size = auxspi_save_size_log_2();
+	int size_blocks = 1 << (size - 9); // ... in units of 512 bytes
+	uint8 type = auxspi_save_type();
+	if (type == 3) {
+		displayPrintState("Formating Flash chip");
+		auxspi_erase();
+	}
+
+	displayPrintState("");
+	FtpChdir(fdir, buf);
+	sprintf(fullname, "Reading file:\n%s%s", fdir, fname);
+	displayMessage(fullname);
+	FtpAccess(fname, FTPLIB_FILE_READ, FTPLIB_IMAGE, buf, &ndata);
+	u32 LEN = 0, num_blocks = 0, shift = 0;
+	switch (type) {
+	case 1:
+		shift = 4; // 16 bytes
+		break;
+	case 2:
+		shift = 5; // 32 bytes
+		break;
+	case 3:
+		shift = 8; // 256 bytes
+		break;
+	default:
+		return;
+	}
+	LEN = 1 << shift;
+	int num_blocks_ftp = 1 << (size - 9);
+	num_blocks = 1 << (size - shift);
+	for (int i = 0; i < num_blocks_ftp; i++) {
+		displayProgressBar(i+1, num_blocks_ftp);
+		int out;
+	    if ((out = FtpRead((u8*)data, 512, ndata)) < 512) {
+			char dings[512];
+			sprintf(dings, "Error: requested 512, got %i", out);
+			while(1);
+		}
+		for (int j = 0; j < 1 << (9-shift); j++) {
+			auxspi_write_data((i << 9)+(j << shift), ((u8*)data)+(j<<shift), LEN, type);
+		}
+	}
+	FtpClose(ndata);
+	FtpQuit(ndata);
+
+	Wifi_DisconnectAP();
+
+	displayMessage("Done! Please turn off your DS.");
+	while(1);
 }
 
 // ------------------------------------------------------------

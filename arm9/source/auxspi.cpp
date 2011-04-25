@@ -28,6 +28,12 @@
 #include "auxspi_core.cpp"
 #include "hardware.h"
 
+#include <algorithm>
+
+using std::max;
+
+extern u8 data[0x8000];
+
 
 // ========================================================
 //  local functions
@@ -265,9 +271,13 @@ void auxspi_erase()
 			auxspi_wait_busy();
 			auxspi_close();
 		}
+	} else {
+		int8 size = 1 << max(0, (auxspi_save_size_log_2() - 15));
+		memset(data, 0, 0x8000);
+		for (int i = 0; i < size; i++) {
+			auxspi_write_data(i << 15, data, 0x8000, type);
+		}
 	}
-	
-	// FIXME: do something for other types as well!
 }
 
 void auxspi_wait_wip()

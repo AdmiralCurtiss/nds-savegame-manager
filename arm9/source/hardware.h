@@ -54,6 +54,9 @@ void hwRestore3in1();
 void hwRestore3in1_b(uint32 size_file);
 void hwErase();
 
+void hwBackupFTP();
+void hwRestoreFTP();
+
 void hwBackupGBA();
 void hwRestoreGBA();
 void hwEraseGBA();

@@ -55,7 +55,7 @@ void displayInit()
 	consoleInit(&lowerScreen, 3,BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
 
 	consoleSelect(&upperScreen);
-	displayMessage("DS savegame manager\nVersion 0.1.1 Beta\nBy Pokedoc");
+	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2 Beta\nBy Pokedoc");
 	
 	displayPrintState("Press (B) to continue");
 	while (!(keysCurrent() & KEY_B));
@@ -63,6 +63,11 @@ void displayInit()
 
 void displayPrintUpper()
 {
+	extern uint32 ezflash;
+	extern bool gba;
+	extern uint32 dstype;
+	extern bool slot2;
+
 	// print upper screen (background)
 	consoleSelect(&upperScreen);
 	consoleSetWindow(&upperScreen, 0, 0, 32, 24);
@@ -73,16 +78,20 @@ void displayPrintUpper()
 	iprintf("Game name:\n");
 	iprintf("Game save:\n");
 	iprintf("Special  :\n");
-#if 0
 	iprintf("--- SLOT 2 ---------------------");
-	iprintf("Game ID  :\n");
-	iprintf("Game name:\n");
-	iprintf("Game save:\n");
-	iprintf("Special  :\n");
-#endif
+	if (dstype > 0)
+		iprintf("This device has no Slot-2");
+	else {
+		iprintf("Game ID  :\n");
+		iprintf("Game name:\n");
+		iprintf("Game save:\n");
+		iprintf("Special  :\n");
+	}
 	
 	// print upper screen
-	consoleSetWindow(&upperScreen, 10, 2, 12, 4);
+	consoleSetWindow(&upperScreen, 10, 2, 22, 4);
+	consoleClear();
+	consoleSetWindow(&upperScreen, 10, 7, 22, 4);
 	consoleClear();
 	
 	// fetch cartridge header (maybe, calling "cardReadHeader" on a FC messes with libfat!)
@@ -108,12 +117,15 @@ void displayPrintUpper()
 	case 3:
 		sprintf(&name[0], "DSi/SD");
 		break;
+	case 4:
+		sprintf(&name[0], "Slot 2");
+		break;
 	}
 	consoleClear();
 	iprintf("%s", name);
 	
 	// 1) The cart id.
-	consoleSetWindow(&upperScreen, 10, 2, 20, 1);
+	consoleSetWindow(&upperScreen, 10, 2, 22, 1);
 	sprintf(&name[0], "----");
 	if (flash_card) {
 		sprintf(&name[0], "Flash Card");
@@ -125,7 +137,7 @@ void displayPrintUpper()
 	iprintf("%s", name);
 
 	// 2) The cart name.
-	consoleSetWindow(&upperScreen, 10, 3, 20, 1);
+	consoleSetWindow(&upperScreen, 10, 3, 22, 1);
 	sprintf(&name[0], "----");
 	if (flash_card) {
 		sprintf(&name[0], "Flash Card");
@@ -137,7 +149,7 @@ void displayPrintUpper()
 	iprintf("%s", name);
 
 	// 3) The save type
-	consoleSetWindow(&upperScreen, 10, 4, 20, 1);
+	consoleSetWindow(&upperScreen, 10, 4, 22, 1);
 	sprintf(&name[0], "----");
 	if (flash_card) {
 		sprintf(&name[0], "Flash Card");
@@ -146,10 +158,10 @@ void displayPrintUpper()
 		uint32 size = auxspi_save_size();
 		switch (type) {
 		case 1:
-			sprintf(&name[0], "Type 1 (%i Bytes)", size);
+			sprintf(&name[0], "Eeprom (%i Bytes)", size);
 			break;
 		case 2:
-			sprintf(&name[0], "Type 2 (%i kB)", size >> 10);
+			sprintf(&name[0], "FRAM (%i kB)", size >> 10);
 			break;
 		case 3:
 			sprintf(&name[0], "Flash (%i kB)", size >> 10);
@@ -163,17 +175,81 @@ void displayPrintUpper()
 	iprintf("%s", name);
 
 	// 4) Special properties (infrared device...)
-	consoleSetWindow(&upperScreen, 10, 5, 24, 1);
+	consoleSetWindow(&upperScreen, 10, 5, 22, 1);
 	consoleClear();
 	memset(&name[0], 0, MAXPATHLEN);
 	//if (auxspi_has_infrared()) {
 	if (ir) {
 		sprintf(&name[0], "Infrared");
 	} else {
-		sprintf(&name[0], "---");
+		sprintf(&name[0], "----");
 	}
 	iprintf("%s", name);
 	
+	// Slot 2 status
+	// 5) GBA game id
+	consoleSetWindow(&upperScreen, 10, 7, 22, 1);
+	consoleClear();
+	memset(&name[0], 0, MAXPATHLEN);
+	if (ezflash) {
+		if (ezflash == 0x89168916)
+			sprintf(name, "3in1 (512M)");
+		else
+			sprintf(name, "3in1 (256M)");
+	} else if (gba)
+		sprintf(name, "%.4s", (char*)0x080000ac);
+	else if (slot2)
+		sprintf(name, "Flash Card");
+	else if (dstype == 0)
+		sprintf(name, "----");
+	if (dstype == 0)
+		iprintf("%s", name);
+
+	// 6) GBA game name
+	consoleSetWindow(&upperScreen, 10, 8, 22, 1);
+	consoleClear();
+	memset(&name[0], 0, MAXPATHLEN);
+	if (ezflash)
+		sprintf(name, "3in1");
+	else if (gba)
+		sprintf(name, "%.12s", (char*)0x080000a0);
+	else if (slot2)
+		sprintf(name, "Flash Card");
+	else if (dstype == 0)
+		sprintf(name, "----");
+	if (dstype == 0)
+		iprintf(name);
+
+	// 7) GBA save size
+	consoleSetWindow(&upperScreen, 10, 9, 22, 1);
+	consoleClear();
+	memset(&name[0], 0, MAXPATHLEN);
+	if (ezflash)
+		sprintf(name, "SRAM");
+	else if (gba)
+		sprintf(name, "(unsupported)");
+	else if (slot2)
+		sprintf(name, "Flash Card");
+	else if (dstype == 0)
+		sprintf(name, "----");
+	if (dstype == 0)
+		iprintf(name);
+
+	// 8) GBA special stuff
+	consoleSetWindow(&upperScreen, 10, 10, 22, 1);
+	consoleClear();
+	memset(&name[0], 0, MAXPATHLEN);
+	if (ezflash)
+		sprintf(name, "NOR + PSRAM");
+	else if (gba)
+		sprintf(name, "(unsupported)");
+	else if (slot2)
+		sprintf(name, "----");
+	else if (dstype == 0)
+		sprintf(name, "----");
+	if (dstype == 0)
+		iprintf(name);
+
 #if 0
 	// hack: some tests to debug new hardware.
 	uint8 data[512];

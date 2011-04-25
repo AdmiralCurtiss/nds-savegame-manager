@@ -33,25 +33,84 @@
 #include <stdio.h>
 #include <dirent.h>
 
+#include <cstdio>
+
 #include "display.h"
 
-char fnames[256][256];
+#include "fileselect.h"
+
+
+extern u8 data[0x8000];
 
 // ---------------------------------------------------------------------------------
+void ftpGetFileList(const char *dir, netbuf *ctrl, uint32 &num)
+{
+	char *buf = (char*)data;
+	memset(buf, 0, 0x8000);
+	FtpDirBuf((char*)data, 0x8000, "/", ctrl);
+	//FtpDir("/dir.txt", "/", ctrl);
+	char *ptr = buf; // scan pointer
+	char *ptr2 = buf; // write pointer
+	// count number of entries and condense them for further use
+	char *begin = 0, *end;
+	while ((end = strchr(ptr, '\n')) != NULL) {
+		char c;
+		char fname[512];
+		if (!strlen(ptr))
+			break;
+		sscanf(ptr, "%c%*s %*s %*s %*s %*s %*s %*s %*s %[^\n]", &c, fname); // gets 'd' or 'f' - dir or file
+		begin = strstr(ptr, fname);
+		if (!begin)
+			break;
+		int flen = end - begin + 1;
+		if (flen <= 1)
+			break; // some FTP servers send an empty line at the end, so prevent an integer overflow
+		if (c == 'd')
+			*ptr2 = 'd';
+		else
+			*ptr2 = 'f';
+		ptr2++;
+		memcpy(ptr2, begin, flen);
+		ptr = end + 1;
+		ptr2 += flen;
+		num++;
+	}
+}
+
 void fileGetFileList(const char *dir, uint32 &num)
 {
+	char *buf = (char*)data;
+	int idx = 0;
+	memset(buf, 0, 0x8000);
+	
 	DIR *pdir;
 	struct dirent *pent;
 	num = 0;
-
 	pdir=opendir(dir);
-
+	char name[128];
 	if (pdir) {
 		while ((pent=readdir(pdir)) !=NULL) {
-			sprintf(&fnames[num][0], "%s", pent->d_name);
-			num++;
-			if (num == 256)
+			char fullname[256];
+			sprintf(fullname, "%s/%s", dir, pent->d_name);
+			struct stat statbuf;
+			stat(fullname, &statbuf);
+			
+			// TODO: check for buffer overflow!
+			if (idx + strlen(pent->d_name) < 0x8000-2) {
+				if (S_ISDIR(statbuf.st_mode)) {
+					int len = sprintf(buf, "d%s\n", pent->d_name);
+					buf += len;
+					idx += len;
+				} else {
+					int len = sprintf(buf, "f%s\n", pent->d_name);
+					buf += len;
+					idx += len;
+				}
+				num++;
+			} else {
+				// buffer overflow imminent
 				break;
+			}
 		}
 	}
 	if (pdir)
@@ -67,45 +126,65 @@ void filePrintFileList(const char *dir, uint32 first, uint32 select, uint32 coun
 	consoleSetWindow(&lowerScreen, 0, 0, 32, 19);
 	consoleClear();
 
-	for (uint32 i = first; (i < first + 18) && (i < count); i++) {
-		struct stat statbuf;
-		char fullpath[512];
-		sprintf(fullpath, "%s/%s", dir, fnames[i]);
-    	stat(fullpath, &statbuf);
-		if (S_ISDIR(statbuf.st_mode)) {
-			if (i != select)		
-				iprintf("[%.29s]\n", fnames[i]);
-			else
-				iprintf("-->[%.26s]\n", fnames[i]);
-		} else {
-			if (i != select)
-				iprintf("%.31s\n", fnames[i]);
-			else
-				iprintf("-->%.28s\n", fnames[i]);
-		}
+	char *buf = (char*)data;
+	int idx = 0;
+	int len = strlen(buf);
+	for (int i = 0; i < first; i++) {
+		buf = strchr(buf, '\n') + 1;
 	}
 
+	for (uint32 i = first; (i < first + 18) && (i < count); i++) {
+		struct stat statbuf;
+		char dir;
+		u32 size;
+		char fname[128];
+		char fname2[128];
+		char *newline = strchr(buf, '\n');
+		int linelen = newline - buf;
+		
+		*newline = 0;
+		if (*buf == 'd') {
+			if (i != select)		
+				iprintf("[%.29s]\n", buf+1);
+			else
+				iprintf("-->[%.26s]\n", buf+1);
+		} else {
+			if (i != select)
+				iprintf("%.31s\n", buf+1);
+			else
+				iprintf("-->%.28s\n", buf+1);
+		}
+		*newline = '\n';
+		buf += linelen+1;
+	}
+	
 	consoleSelect(&lowerScreen);
 	consoleSetWindow(&lowerScreen, 0, 18, 32, 6);
 	consoleClear();
 	iprintf("================================");
 	iprintf("Please select a .sav file\n");
 	iprintf("    (A) Select\n");
+	iprintf("    (B) One directory up\n");
 	if (cancel)
-		iprintf("    (B) cancel");
+		iprintf("    (L+R) cancel (new file)");
 }
 
 // ========================***************************==============================
-void fileSelect(const char *startdir, char *out_dir, char *out_fname, bool allow_cancel)
+void fileSelect(const char *startdir, char *out_dir, char *out_fname, netbuf *buf,
+  bool allow_cancel, bool allow_up)
 {
 	bool select = false;
+	static int size_list = 18;
 	
 	uint32 num_files = 0;
 	uint32 sel_file = 0;
 	uint32 first_file = 0;
 	
 	// get list of files in current dir
-	fileGetFileList(startdir, num_files);
+	if (buf)
+		ftpGetFileList("/", buf, num_files);
+	else
+		fileGetFileList(startdir, num_files);
 	filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
 		
 	while (!select) {
@@ -116,49 +195,82 @@ void fileSelect(const char *startdir, char *out_dir, char *out_fname, bool allow
 		if (keys & KEY_DOWN) {
 			if (sel_file < num_files-1) {
 				sel_file++;
+				if (sel_file >= first_file + size_list - 1)
+					first_file = sel_file - (size_list - 1);
 				filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
-				if (sel_file > first_file + 18)
-					first_file = sel_file - 18;
 			}
 		} else if (keys & KEY_UP) {
 			if (sel_file > 0) {
 				sel_file--;
-				filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
 				if (sel_file < first_file)
 					first_file = sel_file;
+				filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
 			}
 		} else if (keys & KEY_A) {
-			// TODO: Okay, my first attempt at implementing a fuill file browser
-			//  failed, so I am disabling changing directory for now. If anybody
-			//  feels inclined to fix it, go ahead.
-			if (stricmp(fnames[sel_file], ".") == 0)
+			// get selected file name
+			char *buf2 = (char*)data;
+			int idx = 0;
+			int len = strlen(buf2);
+			char fname[128];
+			for (int i = 0; i < sel_file; i++) {
+				buf2 = strchr(buf2, '\n') + 1;
+			}
+			char c;
+			sscanf(buf2, "%c%[^\n]", &c, fname); // gets 'd' or 'f' - dir or file			
+			// special cases
+			if (stricmp(fname, ".") == 0)
+				// don't do anything
 				continue;
-			if (stricmp(fnames[sel_file], "..") == 0)
-				//return;
-				continue;
+			if (stricmp(fname, "..") == 0) {
+				// return to parent function (usually results in "back to higher level")
+				while (keysCurrent() & (KEY_A | KEY_B));
+				if (!allow_up)
+					continue;
+				if (buf)
+					FtpChdir("..", buf);
+				return;
+			}
+			
+			// get selected file properties
 			char fullname[512];
-			sprintf(fullname, "%s/%s", startdir, fnames[sel_file]);
+			sprintf(fullname, "%s%s", startdir, fname);
 			struct stat statbuf;
 			stat(fullname, &statbuf);
-			if (S_ISDIR(statbuf.st_mode)) {
-			/*
+			if (c == 'd') {
 				char fullpath[512];
-				sprintf(fullpath, "%s/%s", startdir, fnames[sel_file]);
-				fileSelect(fullpath, out_dir, out_fname, allow_cancel);
-				for (int i = 0; i < 5; i++)
-					swiWaitForVBlank();
+				sprintf(fullpath, "%s%s/", startdir, fname);
+				if (buf)
+					FtpChdir(fname, buf);
+				fileSelect(fullpath, out_dir, out_fname, buf, allow_cancel, true);
+				if ((keysCurrent() & (KEY_L | KEY_R)) && allow_cancel)
+					return;
+				while (keysCurrent() & (KEY_A | KEY_B));
+				
+				// did we select a file? if so, keep returning to parent calling function
 				if (strlen(out_fname))
 					return;
-					*/
+				
+				// we did not select anything, so regenerate the old list
+				num_files = 0;
+				if (buf)
+					ftpGetFileList("/", buf, num_files);
+				else
+					fileGetFileList(startdir, num_files);
+				filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
 				continue;
 			} else {
 				sprintf(out_dir, "%s", startdir);
-				sprintf(out_fname, "%s", fnames[sel_file]);
+				sprintf(out_fname, "%s", fname);
+				while (keysCurrent() & (KEY_A | KEY_B));
 				return;
 			}
-			select = true;
-			
 		} else if (keys & KEY_B) {
+			if (!allow_up)
+				continue;
+			if (buf)
+				FtpChdir("..", buf);
+			return;
+		} else if (keys & (KEY_L | KEY_R)) {
 			if (allow_cancel) {
 				sprintf(out_dir, "%s", startdir);
 				out_fname[0] = 0;

@@ -33,8 +33,28 @@
 
 #define MAX_CUSTOM_LIST 8192
 
+#include <unistd.h>
+//#endif
+//#if defined(_WIN32)
+//#include <windows.h>
+//#endif
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <ctype.h>
+//#if defined(__unix__)
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
-void fileSelect(const char *startdir, char *out_dir, char *out_fname, bool allow_cancel = false);
+#include "ftplib.h"
+
+
+void fileSelect(const char *startdir, char *out_dir, char *out_fname, netbuf *buf = 0,
+  bool allow_cancel = false, bool allow_up = true);
 
 bool fileExists(const char *fname);
 uint32 fileSize(const char *fname);
