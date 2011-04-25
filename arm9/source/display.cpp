@@ -55,10 +55,10 @@ void displayInit()
 	consoleInit(&lowerScreen, 3,BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
 
 	consoleSelect(&upperScreen);
-	displayMessage("DS savegame manager\nVersion 0.1 Beta\nBy Pokedoc");
+	displayMessage("DS savegame manager\nVersion 0.1.1 Beta\nBy Pokedoc");
 	
-	displayPrintState("Press (A) to continue");
-	while (!(keysCurrent() & KEY_A));
+	displayPrintState("Press (B) to continue");
+	while (!(keysCurrent() & KEY_B));
 }
 
 void displayPrintUpper()

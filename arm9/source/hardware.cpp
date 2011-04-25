@@ -272,11 +272,18 @@ void hwRestore3in1()
 	while(0);
 }
 
-void hwRestore3in1_b(uint32 size)
+void hwRestore3in1_b(uint32 size_file)
 {
-
 	// Third, swap in a new game
-	swap_cart();
+	uint32 size = auxspi_save_size_log_2();
+	while ((size_file < size) || flash_card) {
+		//char txt[33];
+		//sprintf(txt, "%i, %i (%i)", size_file, size, flash_card);
+		//displayPrintState(txt);
+		displayPrintState("File too small or no save chip!");
+		swap_cart();
+		size = auxspi_save_size_log_2();
+	}
 	displayPrintUpper();
 	
 	uint8 type = auxspi_save_type();

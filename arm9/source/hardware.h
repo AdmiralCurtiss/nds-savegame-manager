@@ -51,7 +51,7 @@ bool is_flash_card();
 void hwBackup3in1();
 void hwDump3in1(uint32 size, const char *gamename);
 void hwRestore3in1();
-void hwRestore3in1_b(uint32 size);
+void hwRestore3in1_b(uint32 size_file);
 void hwErase();
 
 void hwBackupGBA();
