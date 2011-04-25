@@ -136,6 +136,8 @@ void hwBackup3in1()
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
 	uint8 type = auxspi_save_type();
 
+	// EZFlash Vi needs this line
+	sysSetBusOwners(true, true);
 	hwFormatNor(0, size_blocks);
 
 	// Dump save and write it to NOR
@@ -197,10 +199,8 @@ void hwDump3in1(uint32 size, const char *gamename)
 	}
 	char fullpath[512];
 	sprintf(fullpath, "%s/%s", path, fname);
-	//sprintf(fullpath, "%s", fname);
 	displayMessage(fname);
 
-	// TODO: add support for smaller files!
 	FILE *file = fopen(fullpath, "wb");
 	if (size < 15)
 		size_blocks = 1;
@@ -209,10 +209,11 @@ void hwDump3in1(uint32 size, const char *gamename)
 	for (u32 i = 0; i < size_blocks; i++) {
 		displayProgressBar(i+1, size_blocks);
 		u32 LEN = 0x8000;
+		// EZFlash Vi needs this line
+		sysSetBusOwners(true, true);
 		ReadNorFlash(data, i << 15, LEN);
 		fwrite(data, 1, LEN, file);
 	}
-	//free(data);
 	fclose(file);
 
 	displayPrintState("Done! Please power off...");
@@ -238,6 +239,8 @@ void hwRestore3in1()
 	}
 	int size_blocks = 1 << max(0, int8(size) - 18); // ... in units of 0x40000 bytes - that's 256 kB
 	
+	// EZFlash Vi needs this line
+	sysSetBusOwners(true, true);
 	hwFormatNor(0, size_blocks);
 
 	// Read save and write it to NOR
@@ -252,6 +255,8 @@ void hwRestore3in1()
 	for (int i = 0; i < size_blocks; i++) {
 		displayProgressBar(i+1, size_blocks);
 		fread(data, 1, 0x8000, file);
+		// EZFlash Vi needs this line
+		sysSetBusOwners(true, true);
 		WriteNorFlash(i << 15, data, 0x8000);
 	}
 	CloseNorWrite();
@@ -321,6 +326,8 @@ void hwRestore3in1_b(uint32 size_file)
 	for (unsigned int i = 0; i < num_blocks; i++) {
 		if (i % (num_blocks >> 6) == 0)
 			displayProgressBar(i+1, num_blocks);
+		// EZFlash Vi needs this line
+		//sysSetBusOwners(true, true);
 		ReadNorFlash(data, i << shift, LEN);
 		auxspi_write_data(i << shift, data, LEN, type);
 	}

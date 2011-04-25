@@ -55,7 +55,7 @@ void displayInit()
 	consoleInit(&lowerScreen, 3,BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
 
 	consoleSelect(&upperScreen);
-	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2 Beta\nBy Pokedoc");
+	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.1 Beta\nBy Pokedoc");
 	
 	displayPrintState("Press (B) to continue");
 	while (!(keysCurrent() & KEY_B));

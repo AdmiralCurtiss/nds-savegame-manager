@@ -37,6 +37,7 @@
 #include <dirent.h>
 
 #include "gba.h"
+#include "dsi.h"
 #include "display.h"
 #include "dsCard.h"
 #include "hardware.h"
@@ -64,7 +65,7 @@ char bootdir[256] = "/";
 void mode_dsi()
 {
 	// DSi mode, does nothing at the moment
-	displayPrintState("DSi mode - unsupported!");
+	displayPrintState("DSi mode - still unsupported!");
 	while (1);
 }
 
@@ -273,11 +274,13 @@ int main(int argc, char* argv[])
 	
 	// Identify hardware and branch to corresponding mode
 	displayPrintState("Identifying hardware...");
-	chip_reset();
+	// EZFlash Vi needs this line
+	sysSetBusOwners(true, true);
 	OpenNorWrite();
 	ezflash = ReadNorFlashID();
 	CloseNorWrite();
-	dstype = 0; // DS/DSL, no idea how to identify DSi etc.
+	// First attempt to identify the DSi. Read address > 8 MB
+	dstype = isDsi() ? 1 : 0; // DS/DSL, no idea how to identify DSi etc.
 	gba = gbaIsGame();
 	
 	// Try to identify slot-2 device. Try opening slot-2 root directory
