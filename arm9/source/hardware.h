@@ -60,7 +60,7 @@ void hwRestoreDSi();
 void hwBackupFTP();
 void hwRestoreFTP();
 
-void hwBackupGBA();
+void hwBackupGBA(u8 type);
 void hwRestoreGBA();
 void hwEraseGBA();
 

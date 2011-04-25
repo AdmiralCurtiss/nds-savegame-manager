@@ -28,4 +28,6 @@
 
 bool isDsi();
 
+bool dsiUnlockSlot1();
+
 #endif

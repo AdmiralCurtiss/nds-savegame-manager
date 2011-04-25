@@ -33,6 +33,7 @@
 #include "auxspi.h"
 #include "hardware.h"
 #include "fileselect.h"
+#include "gba.h"
 
 #include "auxspi_core.cpp"
 
@@ -43,6 +44,7 @@ PrintConsole lowerScreen;
 
 
 extern uint32 mode;
+extern u8 gbatype;
 
 
 //===========================================================
@@ -57,7 +59,7 @@ void displayInit()
 	consoleInit(&lowerScreen, 3,BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
 
 	consoleSelect(&upperScreen);
-	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.2 Beta\nBy Pokedoc");
+	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.3 Beta\nBy Pokedoc");
 	
 	displayPrintState("Press (B) to continue");
 	while (!(keysCurrent() & KEY_B));
@@ -149,7 +151,7 @@ void displayPrintUpper()
 	sprintf(&name[0], "----");
 	if (flash_card) {
 		sprintf(&name[0], "Flash Card");
-	} else if (nds.gameCode[0]) {
+	} else /*if (nds.gameCode[0])*/ {
 		memcpy(&name[0], &nds.gameCode[0], 4);
 		name[4] = 0x00;
 	}
@@ -161,7 +163,7 @@ void displayPrintUpper()
 	sprintf(&name[0], "----");
 	if (flash_card) {
 		sprintf(&name[0], "Flash Card");
-	} else if (nds.gameTitle[0]) {
+	} else /*if (nds.gameTitle[0])*/ {
 		memcpy(&name[0], &nds.gameTitle[0], 12);
 		name[12] = 0x00;
 	}
@@ -250,8 +252,25 @@ void displayPrintUpper()
 	memset(&name[0], 0, MAXPATHLEN);
 	if (ezflash)
 		sprintf(name, "SRAM");
-	else if (gba)
-		sprintf(name, "(unsupported)");
+	else if (gba) {
+		u8 type = gbatype;
+		u8 size = gbaGetSaveSizeLog2(type);
+		switch (type) {
+			case 1:
+			case 2:
+				sprintf(name, "EEPROM (%i bytes)", 1 << size);
+				break;
+			case 3:
+				sprintf(name, "SRAM (%i kB)", 1 << (size - 10));
+				break;
+			case 4:
+			case 5:
+				sprintf(name, "Flash (%i kB)", 1 << (size - 10));
+				break;
+			default:
+				sprintf(name, "(none)");
+		}
+	}
 	else if (slot2)
 		sprintf(name, "Flash Card");
 	else if (dstype == 0)
@@ -273,32 +292,6 @@ void displayPrintUpper()
 		sprintf(name, "----");
 	if (dstype == 0)
 		iprintf(name);
-
-#if 0
-	// hack: some tests to debug new hardware.
-	uint8 data[512];
-	memset(&data[0], 0, 512);
-    char text[128];
-
-	int i;
-	uint32 id = auxspi_save_jedec_id();
-	auxspi_read_data(0, &data[0], 32);
-	/*
-	auxspi_open(0);
-	for (int i = 0; i < 32; i++) {
-		data[i] = auxspi_read();
-	}
-	auxspi_close();
-	*/
-    sprintf(&text[0],
-       "Status: %x\n%x %x %x %x %x %x %x %x\n%x %x %x %x %x %x %x %x\n%x %x %x %x %x %x %x %x\n%x %x %x %x %x %x %x %x\n",
-	   id,
-       data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
-       data[8], data[9], data[10], data[11], data[12], data[13], data[14], data[15],
-       data[16], data[17], data[18], data[19], data[20], data[21], data[22], data[23],
-       data[24], data[25], data[26], data[27], data[28], data[29], data[30], data[31]);
-    displayMessage(&text[0]);
-#endif
 }
 
 void displayPrintLower()

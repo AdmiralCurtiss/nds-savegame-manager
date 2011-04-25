@@ -31,39 +31,15 @@
 
 bool isDsi()
 {
-#if 0
-	// This code attempts to identify an application running in DSi mode. We
-	//  make use of the fact that the DSi has 16 MB of memory, while the DS
-	//  only has 4 MB. Since the Chinese iQue DS has 8 MB, we will read above
-	//  this boundary.
-	u32 test = *(u32*)0x02800000; // this is 8 MB into the main memory
-	/*
-	u32 test2 = *(u32*)0x02000000; // this is 8 MB into the main memory
-	
-	char txt[128];
-	sprintf(txt, "%x %x", test, test2);
-	displayMessage(txt);
-	while(1);
-	
-	if (test == 0x00000000)
-		return false;
-	if (test == test2)
-		return false;
-		*/
-	
-	// Try writing to this address. If the value is accepted, we are on a DSi in DSi mode.
-	*(u32*)0x02800000 = 0x12345678;
-	if (*(u32*)0x02800000 == 0x12345678) {
-		*(u32*)0x02800000 == test;
-		return true;
-	}
-	
-	// The memory address does not exist, so we are on a DS (or a DSi in DS mode)
-	return false;
-#endif
 #define SCFG_MODE    (*(vu8*)0x4004000)
 	if(SCFG_MODE)
 		return (REG_DSIMODE != 0) ? true : false;
 	
+	return false;
+}
+
+bool dsiUnlockSlot1()
+{
+	// we don't know how to fix this yet...
 	return false;
 }

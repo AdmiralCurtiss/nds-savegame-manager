@@ -58,6 +58,7 @@ uint32 dstype = 0;
 bool gba = 0;
 uint32 mode = 0;
 bool slot2 = false;
+u8 gbatype = 0;
 
 char ftp_ip[16] = "ftp_ip";
 char ftp_user[64] = "ftp_user";
@@ -194,12 +195,10 @@ void mode_gba()
 {
 	// use 3in1 to buffer data
 	displayPrintState("");
+	gbatype = gbaGetSaveType();
 	displayPrintUpper();
 	displayPrintLower();
-	
-	displayMessage("This mode is DISABLED.\nPlease remove Slot-2 module\nand restart this tool.");
-	while(1);
-	
+
 	touchPosition touchXY;
 	while(1) {
 		swiWaitForVBlank();
@@ -207,14 +206,14 @@ void mode_gba()
 		
 		// backup
 		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
-			//displayPrintUpper();
-			//hwBackupGBA();
+			displayPrintUpper();
+			hwBackupGBA(gbatype);
 		}
 		
 		// restore
 		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
-			//displayPrintUpper();
-			//hwRestoreGBA();
+			displayPrintUpper();
+			hwRestoreGBA();
 		}
 		
 		// erase
@@ -262,7 +261,7 @@ int main(int argc, char* argv[])
 	
 	// Init the screens
 	displayInit();
-
+	
 	// Init DLDI (file system driver)
 	int fat = fatInitDefault();
 	if (fat == 0) {
@@ -306,10 +305,14 @@ int main(int argc, char* argv[])
 	ir_delay = max(ir_delay, 1000);
 	ini_close(ini);
 	
+	// delete temp file (which is a remnant of inilib)
+	remove("/tmpfile");
+	
 	// Identify hardware and branch to corresponding mode
-	displayPrintState("Identifying hardware...");
+	//displayMessage("Identifying hardware...");
 
-	// Identify DSi (i.e. memory capacity)
+	// 1) Identify DSi (i.e. memory capacity)
+	//displayPrintState("ID: DS model");
 	if (isDsi()) {
 		dstype = 1;
 		size_buf = 1 << 23; // 8 MB
@@ -322,6 +325,7 @@ int main(int argc, char* argv[])
 
 	// don't try to identify Slot-2 in DSi mode.
 	if (dstype == 0) {
+		//displayPrintState("ID: Slot 2");
 		uint32 ime = enterCriticalSection();
 		sysSetBusOwners(true, true);
 		OpenNorWrite();

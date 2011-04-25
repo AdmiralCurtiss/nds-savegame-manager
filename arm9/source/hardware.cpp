@@ -30,6 +30,7 @@
 #include <sys/dir.h>
 #include <sys/unistd.h>
 #include <dswifi9.h>
+#include <nds/card.h>
 
 #include <stdio.h>
 #include <algorithm>
@@ -60,7 +61,6 @@ extern char ftp_user[64];
 extern char ftp_pass[64];
 extern int ftp_port;
 
-
 // ---------------------------------------------------------------------
 bool swap_cart()
 {
@@ -68,9 +68,6 @@ bool swap_cart()
 	nds.gameTitle[0] = 0;
 	
 	while (!nds.gameTitle[0]) {
-		// this is an attempt to account for bad contacts, where "cardreadheader" returns nothing.
-		//  since this problem disappeared after adding this (as usual), I don't know if it works
-	
 		displayMessage("Please take out Slot 1 flash\ncart and insert a game\n\nPress A when done.");
 
 		bool swap = false;
@@ -79,9 +76,11 @@ bool swap_cart()
 				// identify hardware
 				sysSetBusOwners(true, true);
 				cardReadHeader((u8*)&nds);
+				flash_card = false;
+				displayPrintUpper();
 				if (!nds.gameTitle[0])
 					continue;
-			
+				
 				// Look for an IR-enabled game cart first. If the save size returns something
 				//  nonzero, we hae found an IR-enabled game and we are done. If there is no
 				//  IR device present, "size2" is always zero.
@@ -143,10 +142,14 @@ void hwBackupDSi()
 
 void hwRestoreDSi()
 {
-	// TODO: test!
+	hwRestoreFTP();
+
+/*
+	// only works from NOR!
 	char path[256];
 	char fname[256] = "";
 	fileSelect("sd:/", path, fname, 0, true, false);
+	*/
 }
 
 // --------------------------------------------------------
@@ -160,7 +163,7 @@ void hwBackup3in1()
 	uint8 type = auxspi_save_type();
 
 	displayPrintState("Format NOR");
-	hwFormatNor(0, size_blocks);
+	hwFormatNor(1, size_blocks);
 
 	// Dump save and write it to NOR
 	displayPrintState("Writing save to NOR");
@@ -469,13 +472,22 @@ void hwBackupFTP()
 	for (int i = 0; i < (1 << (size - 9)); i++) {
 		displayProgressBar(i+1, (size_blocks << 6));
 		auxspi_read_data(i << 9, (u8*)&data[0], length, type);
-		int out;
+		int out = 0;
+		while (out < 512) {
+			out += FtpWrite((u8*)&data[out], 512-out, ndata);
+			if (out < 512)
+				displayPrintState("!!!");
+			else
+				displayPrintState("");
+		}
+		/*
 	    if ((out = FtpWrite((u8*)&data[0], length, ndata)) < length) {
 			char dings[512];
 			sprintf(dings, "Error: wrote %i, got %i", length, out);
 			displayPrintState(dings);
 			while(1);
 		}
+		*/
 	}
 	FtpClose(ndata);
 	FtpQuit(ndata);
@@ -579,6 +591,15 @@ void hwRestoreFTP()
 	u8 *pdata = data;
 	for (int i = 0; i < num_blocks_ftp; i++) {
 		displayProgressBar(i+1, num_blocks_ftp);
+		int in = 0;
+		while (in < 512) {
+			in += FtpRead((u8*)&pdata[in], 512-in, ndata);
+			if (in < 512)
+				displayPrintState("!!!");
+			else
+				displayPrintState("");
+		}
+		/*
 		int out;
 	    if ((out = FtpRead((u8*)pdata, 512, ndata)) < 512) {
 			char dings[512];
@@ -586,6 +607,7 @@ void hwRestoreFTP()
 			displayPrintState(dings);
 			while(1);
 		}
+		*/
 		// does not fit into memory: insecure mode
 		if (insecure) {
 			//char bums[512];
@@ -620,103 +642,89 @@ void hwRestoreFTP()
 }
 
 // ------------------------------------------------------------
-void hwBackupGBA()
+void hwBackupGBA(u8 type)
 {
-	// TODO: test this, implement missing bits!
-	return;
-	
-	// TODO: select filename
-	char fullname[512];
-	
-	u8 type = gbaGetSaveType();
-	if (type == 0)
+	if ((type == 0) || (type > 5))
 		return;
-	uint32 size = gbaGetSaveSize(type);
-	u8 nbanks = 2;
 	
-	switch (type) {
-	case 1:
-	case 2:
-		// TODO: how to address this one?
-		return;
-	case 3: {
-		// SRAM - this is easy, just functions like conventional RAM
-		FILE *file = fopen(&fullname[0], "wb");
-		for (u32 i = 0; i < size; i++) {
-			fwrite((u8*)(0x0e000000+i), 1, 1, file);
-		}
-		fclose(file);
+	if ((type == 1) || (type == 2)) {
+		displayMessage("I can't read this save type\nyet. Please use Rudolphs tool\ninstead.");
 		return;
 	}
-	case 4:
-		nbanks = 1;
-	case 5: {
-		// FLASH - must be opened by register magic
-		FILE *file = fopen(&fullname[0], "wb");
-		for (int j = 0; j < nbanks; j++) {
-			*(u8*)0x0e005555 = 0xaa;
-			*(u8*)0x0e002aaa = 0x55;
-			*(u8*)0x0e005555 = 0xb0;
-			*(u8*)0x0e000000 = j;
-			for (int i = 0; i < 0x10000; i++) {
-				fwrite((u8*)(0x0e000000+i), 1, 1, file);
+
+	char path[256];
+	char fname[256] = "";
+	char *gamename = (char*)0x080000a0;
+	fileSelect("/", path, fname, 0, true, false);
+	if (!fname[0]) {
+		uint32 cnt = 0;
+		sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
+		while (fileExists(fname)) {
+			if (cnt < 65536)
+				cnt++;
+			else {
+				displayMessage("Unable to get a filename!\nThis means that you have more\nthan 65536 saves! (wow!)\nOops!");
+				while(1);
 			}
+			sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
 		}
-		fclose(file);
-		return;
 	}
-	}
+	char fullpath[512];
+	sprintf(fullpath, "%s/%s", path, fname);
+	displayMessage(fname);
+	
+	displayPrintState("Reading save from game");
+	uint32 size = gbaGetSaveSize(type);
+	gbaReadSave(data, 0, size, type);
+	
+	displayPrintState("Writing save to flash card");
+	FILE *file = fopen(fullpath, "wb");
+	fwrite(data, 1, size, file);
+	fclose(file);
+
+	displayPrintState("Done!");
+	while(1);
 }
 
 void hwRestoreGBA()
 {
-	// TODO: test this, implement missing bits!
-	return;
-	
-	// TODO: select filename
-	char fullname[512];
-	
 	u8 type = gbaGetSaveType();
-	if (type == 0)
+	if ((type == 0) || (type > 5))
 		return;
+	
+	if ((type == 1) || (type == 2)) {
+		displayMessage("I can't write this save type\nyet. Please use Rudolphs tool\ninstead.");
+		return;
+	}
+	
+	//char fullname[512];
+	
 	uint32 size = gbaGetSaveSize(type);
 	u8 nbanks = 2;
 	
-	switch (type) {
-	case 1:
-	case 2:
-		// TODO: how to address this one?
-		return;
-	case 3: {
-		// SRAM - this is easy, just functions like conventional RAM
-		FILE *file = fopen(&fullname[0], "rb");
-		u8 *data = (u8*)malloc(size);
-		fread(&data[0], 1, size, file);
-		for (u32 i = 0; i < size; i++) {
-			*(u8*)(0x0e000000+i) = data[i];
-		}
-		free(data);
-		fclose(file);
-		return;
+	char path[256];
+	char fname[256] = "";
+	char *gamename = (char*)0x080000a0;
+	fileSelect("/", path, fname, 0);
+	char fullpath[512];
+	sprintf(fullpath, "%s/%s", path, fname);
+	displayMessage(fname);
+
+	displayPrintState("Reading save from flash card");
+	FILE *file = fopen(fullpath, "rb");
+	fread(data, 1, size, file);
+	fclose(file);
+	
+	if ((type == 4) || (type == 5)) {
+		displayPrintState("Deleting old save.");
+		gbaFormatSave(type);
 	}
-	case 4:
-		nbanks = 1;
-	case 5: {
-		// FLASH - must be opened by register magic
-		FILE *file = fopen(&fullname[0], "wb");
-		for (int j = 0; j < nbanks; j++) {
-			*(u8*)0x0e005555 = 0xaa;
-			*(u8*)0x0e002aaa = 0x55;
-			*(u8*)0x0e005555 = 0xb0;
-			*(u8*)0x0e000000 = j;
-			for (int i = 0; i < 0x10000; i++) {
-				fwrite((u8*)(0x0e000000+i), 1, 1, file);
-			}
-		}
-		fclose(file);
-		return;
-	}
-	}
+	
+	displayPrintState("Writing save to game");
+	gbaWriteSave(data, 0, size, type);
+
+	displayPrintState("Done!");
+	while(1);
 }
 
 void hwEraseGBA()
