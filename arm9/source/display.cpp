@@ -36,6 +36,8 @@
 
 #include "auxspi_core.cpp"
 
+#include "globals.h"
+
 PrintConsole upperScreen;
 PrintConsole lowerScreen;
 
@@ -55,7 +57,7 @@ void displayInit()
 	consoleInit(&lowerScreen, 3,BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
 
 	consoleSelect(&upperScreen);
-	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.1 Beta\nBy Pokedoc");
+	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.2 Beta\nBy Pokedoc");
 	
 	displayPrintState("Press (B) to continue");
 	while (!(keysCurrent() & KEY_B));
@@ -80,7 +82,7 @@ void displayPrintUpper()
 	iprintf("Special  :\n");
 	iprintf("--- SLOT 2 ---------------------");
 	if (dstype > 0)
-		iprintf("This device has no Slot-2");
+		iprintf("This device has no Slot-2\n");
 	else {
 		iprintf("Game ID  :\n");
 		iprintf("Game name:\n");
@@ -100,6 +102,24 @@ void displayPrintUpper()
 	sNDSHeader nds;
 	if (!flash_card)
 		cardReadHeader((uint8*)&nds);
+	// search for the correct header
+	/*
+	for (int i = 0; i < 0x1000000; i++)
+	{
+		char *test = (char*)0x02000000;
+		if ((test[0]=='C')&&(test[1]=='P')&&(test[2]=='U')&&(test[3]=='D')) {
+			iprintf("found!");
+			while(1);
+		}
+		test++;
+	}
+	*/
+	//nds = NDS_HEADER;
+	/*
+	if (nds.gameTitle[0] == 0xff)
+		// DSi
+		nds = NDS_HEADER;
+		*/
 	
 	char name[MAXPATHLEN];
 	// 0) print the mode
@@ -194,8 +214,12 @@ void displayPrintUpper()
 	if (ezflash) {
 		if (ezflash == 0x89168916)
 			sprintf(name, "3in1 (512M)");
+		else if (ezflash == 0x227E2218)
+			sprintf(name, "3in1 (256M V2)");
+		else if (ezflash == 0x227E2202)
+			sprintf(name, "3in1 (256M V1)");
 		else
-			sprintf(name, "3in1 (256M)");
+			sprintf(name, "3in1 (unknown type)");
 	} else if (gba)
 		sprintf(name, "%.4s", (char*)0x080000ac);
 	else if (slot2)

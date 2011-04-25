@@ -38,6 +38,7 @@
 #include "dsCard.h"
 #include "ftplib.h"
 #include "gba.h"
+#include "globals.h"
 
 #include "hardware.h"
 
@@ -49,6 +50,8 @@ using namespace std;
 
 uint32 boot;
 
+static u32 pitch = 0x40000;
+
 bool flash_card = true; // the homebrew will always start with a FC inserted
 bool with_infrared = false; // ... which does not have an IR device
 
@@ -57,7 +60,6 @@ extern char ftp_user[64];
 extern char ftp_pass[64];
 extern int ftp_port;
 
-u8 data[0x8000];
 
 // ---------------------------------------------------------------------
 bool swap_cart()
@@ -114,51 +116,90 @@ bool is_flash_card()
 	return flash_card;
 }
 
+bool swap_card_game(uint32 size)
+{
+	return false;
+}
+
 // --------------------------------------------------------
 void hwFormatNor(uint32 page, uint32 count)
 {
-	chip_reset();
-	OpenNorWrite();
+	uint32 ime = hwGrab3in1();
 	SetSerialMode();
 	displayPrintState("Formating NOR memory");
 	displayProgressBar(0, count);
-	for (int i = page; i < page+count; i++) {
+	for (uint32 i = page; i < page+count; i++) {
 		Block_Erase(i << 18);
-		displayProgressBar(i+1, count);
+		displayProgressBar(i+1-page, count);
 	}
-	CloseNorWrite();
+	hwRelease3in1(ime);
+}
+
+// --------------------------------------------------------
+void hwBackupDSi()
+{
+	hwBackupFTP();
+}
+
+void hwRestoreDSi()
+{
+	// TODO: test!
+	char path[256];
+	char fname[256] = "";
+	fileSelect("sd:/", path, fname, 0, true, false);
 }
 
 // --------------------------------------------------------
 void hwBackup3in1()
 {
+	swap_cart();
+	displayPrintUpper();
+
 	uint8 size = auxspi_save_size_log_2();
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
 	uint8 type = auxspi_save_type();
 
-	// EZFlash Vi needs this line
-	sysSetBusOwners(true, true);
+	displayPrintState("Format NOR");
 	hwFormatNor(0, size_blocks);
 
 	// Dump save and write it to NOR
-	chip_reset();
-	OpenNorWrite();
-	SetSerialMode();
 	displayPrintState("Writing save to NOR");
+	// TODO: test smaller write size!
 	if (size < 15)
 		size_blocks = 1;
 	else
 		size_blocks = 1 << (uint8(size) - 15);
+	u8 *test = (u8*)malloc(0x8000);
+	u32 LEN = min(1 << size, 0x8000);
+	
 	for (int i = 0; i < size_blocks; i++) {
 		displayProgressBar(i+1, size_blocks);
-		auxspi_read_data(i << 15, data, 0x8000, type);
-		WriteNorFlash(i << 15, data, 0x8000);
+		auxspi_read_data(i << 15, data, LEN, type);
+		// TODO: pull out "setserialmode"
+		uint32 ime = hwGrab3in1();
+		SetSerialMode();
+		WriteNorFlash((i << 15) + pitch, data, LEN);
+		hwRelease3in1(ime);
+		for (int j = 0; j < 4; j++) {
+			uint32 ime = hwGrab3in1();
+			ReadNorFlash(test, (i << 15) + pitch, LEN);
+			hwRelease3in1(ime);
+		}
+		if (*((vuint16 *)(FlashBase+0x2002)) == 0x227E) {
+			displayMessage("ERROR: ID mode active!");
+			while(1);
+		}
+		if (memcmp(test, data, LEN)) {
+			displayMessage("ERROR: verifying NOR failed");
+			while(1);
+		}
 	}
-	CloseNorWrite();
+	free(test);
 
-	// Write a flag to tell the app what happens on restart
+	// Write a flag to tell the app what happens on restart.
+	// This is necessary, since some DLDI drivers cease working after swapping a card.
 	sNDSHeader nds;
-	cardReadHeader((u8*)&nds);
+	cardReadHeader((u8*)&nds); // on a Cyclops Evolution, this call *will* mess up your DLDI driver!
 	dsCardData data2;
 	memset(&data2, 0, sizeof(data2));
 	data2.data[0] = RS_BACKUP;
@@ -169,7 +210,7 @@ void hwBackup3in1()
 	WriteSram(0x0a000000, (u8*)&data2, sizeof(data2));
 	char txt[128];
 	sprintf(txt, "%.12s", &nds.gameTitle[0]);
-
+	
 	displayMessage("Save has been written to 3in1.\nPlease power off and restart\nthis tool.");
 
 	while(1) {};
@@ -177,8 +218,6 @@ void hwBackup3in1()
 
 void hwDump3in1(uint32 size, const char *gamename)
 {
-	displayPrintState("Writing file to flash card");
-
 	u32 size_blocks = 1 << max(0, (uint8(size) - 18));
 
 	char path[256];
@@ -201,6 +240,7 @@ void hwDump3in1(uint32 size, const char *gamename)
 	sprintf(fullpath, "%s/%s", path, fname);
 	displayMessage(fname);
 
+	displayPrintState("Writing save to flash card");
 	FILE *file = fopen(fullpath, "wb");
 	if (size < 15)
 		size_blocks = 1;
@@ -208,10 +248,10 @@ void hwDump3in1(uint32 size, const char *gamename)
 		size_blocks = 1 << (uint8(size) - 15);
 	for (u32 i = 0; i < size_blocks; i++) {
 		displayProgressBar(i+1, size_blocks);
-		u32 LEN = 0x8000;
-		// EZFlash Vi needs this line
-		sysSetBusOwners(true, true);
-		ReadNorFlash(data, i << 15, LEN);
+		u32 LEN = min((u32)0x8000, (u32)1 << size);
+		uint32 ime = hwGrab3in1();
+		ReadNorFlash(data, (i << 15) + pitch, LEN);
+		hwRelease3in1(ime);
 		fwrite(data, 1, LEN, file);
 	}
 	fclose(file);
@@ -239,47 +279,40 @@ void hwRestore3in1()
 	}
 	int size_blocks = 1 << max(0, int8(size) - 18); // ... in units of 0x40000 bytes - that's 256 kB
 	
-	// EZFlash Vi needs this line
-	sysSetBusOwners(true, true);
-	hwFormatNor(0, size_blocks);
+	hwFormatNor(1, size_blocks);
+	displayPrintState("Writing save to NOR");
 
 	// Read save and write it to NOR
-	chip_reset();
-	OpenNorWrite();
-	SetSerialMode();
-	displayPrintState("Writing save to NOR");
 	if (size < 15)
 		size_blocks = 1;
 	else
 		size_blocks = 1 << (uint8(size) - 15);
+	u8 *test = (u8*)malloc(0x8000);
+	uint32 LEN = min(1 << size, 0x8000);
+
 	for (int i = 0; i < size_blocks; i++) {
-		displayProgressBar(i+1, size_blocks);
-		fread(data, 1, 0x8000, file);
-		// EZFlash Vi needs this line
-		sysSetBusOwners(true, true);
-		WriteNorFlash(i << 15, data, 0x8000);
+		displayProgressBar(i, size_blocks);
+		fread(data, 1, LEN, file);
+		uint32 ime = hwGrab3in1();
+		SetSerialMode();
+		WriteNorFlash((i << 15) + pitch, data, LEN);
+		ReadNorFlash(test, (i << 15) + pitch, LEN);
+		hwRelease3in1(ime);
+		if (*((vuint16 *)(FlashBase+0x2002)) == 0x227E) {
+			displayMessage("ERROR: ID mode active!");
+			while(1);
+		}
+		if (int err = memcmp(test, data, LEN)) {
+			char txt[128];
+			sprintf(txt, "ERROR: NOR %x/%x: %x -> %x", abs(err), LEN, data[err], test[err]);
+			displayMessage(txt);
+			while(1);
+		}
 	}
-	CloseNorWrite();
 	fclose(file);
+	free(test);
 	
-	// FIXME: for some weird reason, reading the save written to NOR right now managed to mangle
-	//  precisely 2 bytes in my HG save, but not in my Platinum one. Therefore, we need to
-	//  make this a two-stage process as well, to prevent this weitd glitch.
-	//  (It appears in two different hardware revisions of the 3in1!)
-
-	// Write a flag to tell the app what happens on restart
-	sNDSHeader nds;
-	cardReadHeader((u8*)&nds);
-	dsCardData data2;
-	memset(&data2, 0, sizeof(data2));
-	data2.data[0] = RS_BACKUP;
-	data2.data[1] = 0;
-	data2.data[2] = size;
-	data2.data[3] = 0xbad00bad;
-	WriteSram(0x0a000000, (u8*)&data2, sizeof(data2));
-
-	displayMessage("Thanks to some crazy bug,\nyou will need to restart your\nDS and this app. Sorry.");
-	while(0);
+	hwRestore3in1_b(size);
 }
 
 void hwRestore3in1_b(uint32 size_file)
@@ -287,9 +320,6 @@ void hwRestore3in1_b(uint32 size_file)
 	// Third, swap in a new game
 	uint32 size = auxspi_save_size_log_2();
 	while ((size_file < size) || flash_card) {
-		//char txt[33];
-		//sprintf(txt, "%i, %i (%i)", size_file, size, flash_card);
-		//displayPrintState(txt);
 		displayPrintState("File too small or no save chip!");
 		swap_cart();
 		size = auxspi_save_size_log_2();
@@ -321,17 +351,14 @@ void hwRestore3in1_b(uint32 size_file)
 	LEN = 1 << shift;
 	num_blocks = 1 << (size - shift);
 
-	chip_reset();
-	OpenNorWrite();
 	for (unsigned int i = 0; i < num_blocks; i++) {
 		if (i % (num_blocks >> 6) == 0)
 			displayProgressBar(i+1, num_blocks);
-		// EZFlash Vi needs this line
-		//sysSetBusOwners(true, true);
-		ReadNorFlash(data, i << shift, LEN);
+		uint32 ime = hwGrab3in1();
+		ReadNorFlash(data, (i << shift) + pitch, LEN);
+		hwRelease3in1(ime);
 		auxspi_write_data(i << shift, data, LEN, type);
 	}
-	CloseNorWrite();
 	displayProgressBar(1, 1);
 
 	
@@ -502,9 +529,6 @@ void hwRestoreFTP()
 	displayMessage("Please select a file name to\nrestore.");
 	displayPrintState("FTP: dir");
 	fileSelect("/", fdir, fname, buf, true, false);
-	/*char fn[512];
-	displayMessage(fname);
-	while(1);*/
 	
 	// Third: swap card
 	swap_cart();
@@ -512,16 +536,12 @@ void hwRestoreFTP()
 	uint8 size = auxspi_save_size_log_2();
 	int size_blocks = 1 << (size - 9); // ... in units of 512 bytes
 	uint8 type = auxspi_save_type();
-	if (type == 3) {
-		displayPrintState("Formating Flash chip");
-		auxspi_erase();
-	}
 
+	// Fourth: read file
 	displayPrintState("");
 	FtpChdir(fdir, buf);
 	sprintf(fullname, "Reading file:\n%s%s", fdir, fname);
 	displayMessage(fullname);
-	FtpAccess(fname, FTPLIB_FILE_READ, FTPLIB_IMAGE, buf, &ndata);
 	u32 LEN = 0, num_blocks = 0, shift = 0;
 	switch (type) {
 	case 1:
@@ -539,16 +559,55 @@ void hwRestoreFTP()
 	LEN = 1 << shift;
 	int num_blocks_ftp = 1 << (size - 9);
 	num_blocks = 1 << (size - shift);
+	
+	// if our save is small enough to fit in memory, use secure mode (i.e. read full file before erasing anything
+	bool insecure = ((1 << size) > size_buf);
+	if (insecure) {
+#if 0
+		displayMessage("Save larger than available RAM.\nRestoring will be dangerous!\n\nPress Start + Select to proceed");
+		while (!(keysCurrent() & (KEY_START | KEY_SELECT)));
+#else
+		displayMessage("Save larger than available RAM.\nRestoring is buggy, so\nI will stop here.\n(Try Rudolphs tools.)");
+		while (1);
+#endif
+	}
+	if ((type == 3) && (insecure)) {
+		displayPrintState("Formating Flash chip");
+		auxspi_erase();
+	}
+	FtpAccess(fname, FTPLIB_FILE_READ, FTPLIB_IMAGE, buf, &ndata);
+	u8 *pdata = data;
 	for (int i = 0; i < num_blocks_ftp; i++) {
 		displayProgressBar(i+1, num_blocks_ftp);
 		int out;
-	    if ((out = FtpRead((u8*)data, 512, ndata)) < 512) {
+	    if ((out = FtpRead((u8*)pdata, 512, ndata)) < 512) {
 			char dings[512];
 			sprintf(dings, "Error: requested 512, got %i", out);
+			displayPrintState(dings);
 			while(1);
 		}
-		for (int j = 0; j < 1 << (9-shift); j++) {
-			auxspi_write_data((i << 9)+(j << shift), ((u8*)data)+(j<<shift), LEN, type);
+		// does not fit into memory: insecure mode
+		if (insecure) {
+			//char bums[512];
+			//sprintf(bums, "addr = %x", (i << 9)+(j << shift));
+			displayPrintState("Writing save (insecure!)");
+			//displayPrintState(bums);
+			for (int j = 0; j < 1 << (9-shift); j++) {
+				auxspi_write_data((i << 9)+(j << shift), ((u8*)pdata)+(j<<shift), LEN, type);
+			}
+		}
+		pdata += 512;
+	}
+	if (!insecure) {
+		displayMessage("Got file, now writing to game");
+		if (type == 3) {
+			displayPrintState("Formating Flash chip");
+			auxspi_erase();
+		}
+		for (int i = 0; i < (1 << (size - shift)); i++) {
+			displayPrintState("Writing save");
+			displayProgressBar(i+1, 1 << (size - shift));
+			auxspi_write_data(i << shift, ((u8*)data)+(i<<shift), LEN, type);
 		}
 	}
 	FtpClose(ndata);
@@ -663,4 +722,20 @@ void hwRestoreGBA()
 void hwEraseGBA()
 {
 	// TODO: implement chip erase!
+}
+
+// -------------------------------------------------
+uint32 hwGrab3in1()
+{
+	uint32 ime = enterCriticalSection();
+	sysSetBusOwners(true, true);
+	chip_reset();
+	OpenNorWrite();
+	return ime;
+}
+
+void hwRelease3in1(uint32 ime)
+{
+	CloseNorWrite();
+	leaveCriticalSection(ime);
 }

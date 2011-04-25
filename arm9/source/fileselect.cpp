@@ -40,14 +40,15 @@
 #include "fileselect.h"
 
 
-extern u8 data[0x8000];
+extern u8 *data;
+extern u32 size_buf;
 
 // ---------------------------------------------------------------------------------
 void ftpGetFileList(const char *dir, netbuf *ctrl, uint32 &num)
 {
 	char *buf = (char*)data;
-	memset(buf, 0, 0x8000);
-	FtpDirBuf((char*)data, 0x8000, "/", ctrl);
+	memset(buf, 0, size_buf);
+	FtpDirBuf((char*)data, size_buf, "/", ctrl);
 	//FtpDir("/dir.txt", "/", ctrl);
 	char *ptr = buf; // scan pointer
 	char *ptr2 = buf; // write pointer

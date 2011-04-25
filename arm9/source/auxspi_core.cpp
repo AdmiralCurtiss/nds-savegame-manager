@@ -26,6 +26,8 @@
 
 #include <nds.h>
 
+extern int ir_delay;
+
 inline void auxspi_wait_busy()
 {
 	while (REG_AUXSPICNT & 0x80);
@@ -78,8 +80,8 @@ inline uint16 auxspi_read_16()
 inline void auxspi_disable_infrared_core()
 {
 	auxspi_open(0);
-	swiDelay(1000);
+	swiDelay(ir_delay);
 	auxspi_open(2);
 	auxspi_write(0);
-	swiDelay(1000);
+	swiDelay(ir_delay);
 }

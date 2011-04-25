@@ -32,7 +32,8 @@
 
 using std::max;
 
-extern u8 data[0x8000];
+extern u8 *data;
+extern u32 size_buf;
 
 
 // ========================================================

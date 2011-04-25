@@ -36,6 +36,8 @@
 
 #include <dirent.h>
 
+#include <algorithm>
+
 #include "gba.h"
 #include "dsi.h"
 #include "display.h"
@@ -45,6 +47,10 @@
 
 #include "libini.h"
 
+u8 *data;
+u32 size_buf;
+
+using std::max;
 
 
 uint32 ezflash = 0;
@@ -57,6 +63,7 @@ char ftp_ip[16] = "ftp_ip";
 char ftp_user[64] = "ftp_user";
 char ftp_pass[64] = "ftp_pass";
 int ftp_port = 0;
+int ir_delay = 1000;
 
 char bootdir[256] = "/";
 
@@ -64,6 +71,36 @@ char bootdir[256] = "/";
 // ============================================================================
 void mode_dsi()
 {
+	// TODO: test is SD card is present!
+
+	// use 3in1 to buffer data
+	displayPrintState("");
+	displayPrintUpper();
+	displayPrintLower();
+	
+	touchPosition touchXY;
+	while(1) {
+		swiWaitForVBlank();
+		touchRead(&touchXY);
+		
+		// backup
+		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
+			hwBackupDSi();
+		}
+		
+		// restore
+		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
+			hwRestoreDSi();
+		}
+		
+		// erase
+		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
+			swap_cart();
+			displayPrintUpper();
+			hwErase();
+		}
+	}
+
 	// DSi mode, does nothing at the moment
 	displayPrintState("DSi mode - still unsupported!");
 	while (1);
@@ -136,8 +173,6 @@ void mode_3in1()
 		
 		// backup
 		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
-			swap_cart();
-			displayPrintUpper();
 			hwBackup3in1();
 		}
 		
@@ -192,8 +227,6 @@ void mode_gba()
 
 void mode_wifi()
 {
-	displayPrintUpper();
-	
 	// use 3in1 to buffer data
 	displayPrintState("");
 	displayPrintUpper();
@@ -268,39 +301,44 @@ int main(int argc, char* argv[])
 	ini_readString(ini, ftp_pass, 64);
 	ini_locateKey(ini, "ftp_port");
 	ini_readInt(ini, &ftp_port);
+	ini_locateKey(ini, "ir_delay");
+	ini_readInt(ini, &ir_delay);
+	ir_delay = max(ir_delay, 1000);
 	ini_close(ini);
-	//displayPrintState(ftp_user);
-	//while (1);
 	
 	// Identify hardware and branch to corresponding mode
 	displayPrintState("Identifying hardware...");
-	// EZFlash Vi needs this line
-	sysSetBusOwners(true, true);
-	OpenNorWrite();
-	ezflash = ReadNorFlashID();
-	CloseNorWrite();
-	// First attempt to identify the DSi. Read address > 8 MB
-	dstype = isDsi() ? 1 : 0; // DS/DSL, no idea how to identify DSi etc.
-	gba = gbaIsGame();
+
+	// Identify DSi (i.e. memory capacity)
+	if (isDsi()) {
+		dstype = 1;
+		size_buf = 1 << 23; // 8 MB
+	} else {
+		dstype = 0;
+		size_buf = 1 << 21; // 2 MB
+		//size_buf = 1 << 14; // 32 kB - TESTING ONLY!
+	}
+	data = (u8*)malloc(size_buf);
+
+	// don't try to identify Slot-2 in DSi mode.
+	if (dstype == 0) {
+		uint32 ime = enterCriticalSection();
+		sysSetBusOwners(true, true);
+		OpenNorWrite();
+		ezflash = ReadNorFlashID();
+		CloseNorWrite();
+		leaveCriticalSection(ime);
+		chip_reset();
+
+		gba = gbaIsGame();
+	}
 	
 	// Try to identify slot-2 device. Try opening slot-2 root directory
-	// Nope, does not work: CyclopsDS mounts itself on fat1, fat2, fat3,... (didn't test more)
-	/*
-	DIR* pdir = opendir("fat2:/");
-	struct dirent *pent;
-	if (pdir) {
-		pent=readdir(pdir);
-		if (pent)
-			//char fullname[256];
-			displayMessage(pent->d_name);
-			//slot2=true;
-	}
-	*/
 	if (argv[0][3] == '2')
 		slot2 = true;
 	
 	if (dstype == 1) {
-		// DSi/DSiXL, will branch to SD-card mode when cracked.
+		// DSi/DSiXL, branch to SD-card mode when cracked.
 		mode = 3;
 		mode_dsi();
 	} else if (slot2) {
