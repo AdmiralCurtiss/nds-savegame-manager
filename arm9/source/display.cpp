@@ -38,6 +38,7 @@
 #include "auxspi_core.cpp"
 
 #include "globals.h"
+#include "strings.h"
 
 PrintConsole upperScreen;
 PrintConsole lowerScreen;
@@ -59,7 +60,7 @@ void displayInit()
 	consoleInit(&lowerScreen, 3,BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
 
 	consoleSelect(&upperScreen);
-	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.3 Beta\nBy Pokedoc");
+	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.4 Beta\nBy Pokedoc");
 	
 	displayPrintState("Press (B) to continue");
 	while (!(keysCurrent() & KEY_B));
@@ -134,7 +135,7 @@ void displayPrintUpper()
 		sprintf(&name[0], "GBA");
 		break;
 	case 2:
-		sprintf(&name[0], "3-in-1");
+		sprintf(&name[0], "3in1");
 		break;
 	case 3:
 		sprintf(&name[0], "DSi/SD");
@@ -336,6 +337,35 @@ void displayMessage(const char *msg)
   consoleClear();
 
   iprintf("%s", msg);
+}
+
+void displayMessageA(int id)
+{
+	displayMessage(stringsGetMessageString(id));
+}
+
+void displayMessage2(const char *msg, bool warn)
+{
+  consoleSelect(&lowerScreen);
+  consoleSetWindow(&lowerScreen, 0, 0, 32, 24);
+  consoleClear();
+
+  if (warn) {
+    iprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+	for (int i = 0; i < 22; i++)
+		iprintf("!                              !");
+    iprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  }
+  
+  consoleSetWindow(&lowerScreen, 2, 2, 28, 20);
+  consoleClear();
+  
+  iprintf("%s", msg);
+}
+
+void displayMessage2A(int id, bool warn)
+{
+	displayMessage2(stringsGetMessageString(id), warn);
 }
 
 void displayPrintState(const char *txt)

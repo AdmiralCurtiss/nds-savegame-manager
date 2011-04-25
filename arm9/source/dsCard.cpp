@@ -103,7 +103,7 @@ void SetSerialMode()
 }
 uint32   ReadNorFlashID()
 {
-	// This function was damaged on the origonal sample, "ID mode" was never left. It is fixed now.
+	// This function was damaged on the original sample, "ID mode" was never left. It is fixed now.
 		vuint16 id1,id2,id3,id4;
 		ID=0;
 		//check intel 512M 3in1 card

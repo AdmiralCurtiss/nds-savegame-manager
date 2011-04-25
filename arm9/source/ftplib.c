@@ -75,7 +75,8 @@
 #endif
 
 #include "display.h"
-#define perror iprintf
+//#define perror iprintf
+#define perror //
 
 struct NetBuf {
     char *cput,*cget;

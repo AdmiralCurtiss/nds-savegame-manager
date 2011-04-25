@@ -38,7 +38,13 @@ void displayInit();
 void displayPrintUpper();
 void displayPrintLower();
 
-void displayMessage(const char *msg);
+void displayMessage(const char *msg);// upper screen
+void displayMessage2(const char *msg, bool warn); // lower screen
+
+// ftplib includes this file, and it is pure c, so no operator overloading for now.
+void displayMessageA(int id);// upper screen, string table version
+void displayMessage2A(int id, bool warn); // lower screen, string table version
+
 void displayProgressBar(int cur, int max0);
 void displayPrintState(const char *txt);
 

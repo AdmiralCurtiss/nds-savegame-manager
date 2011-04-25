@@ -44,6 +44,7 @@
 #include "dsCard.h"
 #include "hardware.h"
 #include "fileselect.h"
+#include "strings.h"
 
 #include "libini.h"
 
@@ -148,23 +149,18 @@ void mode_3in1()
 	displayPrintLower();
 	
 	dsCardData data2;
-	ReadSram(0x0a000000, (u8*)&data2, sizeof(data2));
+	uint32 ime = hwGrab3in1();
+	ReadNorFlash(data, 0, 0x8000);
+	hwRelease3in1(ime);
+	memcpy(&data2, &data[0x1000], sizeof(data2));
 	if ((data2.data[0] == RS_BACKUP) && (data2.data[1] == 0) && (data2.data[3] == 0xffff00ff)) {
 		uint32 size = data2.data[2];
 		char name[13];
 		memcpy(&name[0], &data2.name[0], 12);
 		name[12] = 0;
-		memset(&data2, 0, sizeof(data2));
-		WriteSram(0x0a000000, (u8*)&data2, sizeof(data2));
+		displayMessageA(STR_HW_3IN1_CLEAR_FLAG); // lower screen is used for file browser
+		hwFormatNor(0, 1); // clear reboot flag
 		hwDump3in1(size, name);
-	} else if ((data2.data[0] == RS_BACKUP) && (data2.data[1] == 0) && (data2.data[3] == 0xbad00bad)) {
-		uint32 size = data2.data[2];
-		char name[13];
-		memcpy(&name[0], &data2.name[0], 12);
-		name[12] = 0;
-		memset(&data2, 0, sizeof(data2));
-		WriteSram(0x0a000000, (u8*)&data2, sizeof(data2));
-		hwRestore3in1_b(size);
 	}
 	
 	touchPosition touchXY;
@@ -187,6 +183,7 @@ void mode_3in1()
 			swap_cart();
 			displayPrintUpper();
 			hwErase();
+			displayPrintLower();
 		}
 	}
 }
@@ -239,11 +236,13 @@ void mode_wifi()
 		// backup
 		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
 			hwBackupFTP();
+			displayPrintLower();
 		}
 		
 		// restore
 		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
 			hwRestoreFTP();
+			displayPrintLower();
 		}
 		
 		// erase
@@ -251,6 +250,7 @@ void mode_wifi()
 			swap_cart();
 			displayPrintUpper();
 			hwErase();
+			displayPrintLower();
 		}
 	}
 }
@@ -269,16 +269,24 @@ int main(int argc, char* argv[])
 		while (1) {};
 	}
 	
+	// test if our flash card supports argv at all. some R4 clones seem to be very picky!
+	//  (untested due to lack of an R4 myself, but I hope it works)
+	bool has_argv = false;
+	if (argc)
+		has_argv = true;
+	
 	// load ini file...
 	ini_fd_t ini = 0;
 	char inipath[256];
-	if (argv[0]) {
-		char *last = strrchr(argv[0], '/');
-		int len = (last - argv[0])+1;
-		strncpy(bootdir, argv[0], len);
-		sprintf(inipath, "%s/savegame_manager.ini", bootdir);
-		if (fileExists(inipath))
-			ini = ini_open(inipath, "r", "");
+	if (has_argv) {
+		if (argv[0]) {
+			char *last = strrchr(argv[0], '/');
+			int len = (last - argv[0])+1;
+			strncpy(bootdir, argv[0], len);
+			sprintf(inipath, "%s/savegame_manager.ini", bootdir);
+			if (fileExists(inipath))
+				ini = ini_open(inipath, "r", "");
+		}
 	}
 	if (!ini) {
 		sprintf(inipath, "/savegame_manager.ini");
@@ -307,6 +315,9 @@ int main(int argc, char* argv[])
 	
 	// delete temp file (which is a remnant of inilib)
 	remove("/tmpfile");
+	
+	// load strings
+	stringsLoadFile(0);
 	
 	// Identify hardware and branch to corresponding mode
 	//displayMessage("Identifying hardware...");

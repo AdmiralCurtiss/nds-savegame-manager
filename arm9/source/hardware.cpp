@@ -46,6 +46,7 @@
 #include "fileselect.h"
 
 #include "auxspi.h"
+#include "strings.h"
 
 using namespace std;
 
@@ -68,7 +69,7 @@ bool swap_cart()
 	nds.gameTitle[0] = 0;
 	
 	while (!nds.gameTitle[0]) {
-		displayMessage("Please take out Slot 1 flash\ncart and insert a game\n\nPress A when done.");
+		displayMessage2A(STR_HW_SWAP_CARD, false);
 
 		bool swap = false;
 		while (!swap) {
@@ -125,7 +126,7 @@ void hwFormatNor(uint32 page, uint32 count)
 {
 	uint32 ime = hwGrab3in1();
 	SetSerialMode();
-	displayPrintState("Formating NOR memory");
+	//displayPrintState("Formating NOR memory");
 	displayProgressBar(0, count);
 	for (uint32 i = page; i < page+count; i++) {
 		Block_Erase(i << 18);
@@ -162,12 +163,10 @@ void hwBackup3in1()
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
 	uint8 type = auxspi_save_type();
 
-	displayPrintState("Format NOR");
-	hwFormatNor(1, size_blocks);
+	displayMessage2A(STR_HW_3IN1_FORMAT_NOR, false);
+	hwFormatNor(0, size_blocks+1);
 
-	// Dump save and write it to NOR
-	displayPrintState("Writing save to NOR");
-	// TODO: test smaller write size!
+	displayMessage2A(STR_HW_3IN1_WRITE_NOR, false);
 	if (size < 15)
 		size_blocks = 1;
 	else
@@ -178,7 +177,6 @@ void hwBackup3in1()
 	for (int i = 0; i < size_blocks; i++) {
 		displayProgressBar(i+1, size_blocks);
 		auxspi_read_data(i << 15, data, LEN, type);
-		// TODO: pull out "setserialmode"
 		uint32 ime = hwGrab3in1();
 		SetSerialMode();
 		WriteNorFlash((i << 15) + pitch, data, LEN);
@@ -201,6 +199,9 @@ void hwBackup3in1()
 
 	// Write a flag to tell the app what happens on restart.
 	// This is necessary, since some DLDI drivers cease working after swapping a card.
+	// Fix for dead batteries: don't write "reboot" values to SRAM, but to NOR.
+	displayMessage2A(STR_HW_3IN1_PREPARE_REBOOT, false);
+	//
 	sNDSHeader nds;
 	cardReadHeader((u8*)&nds); // on a Cyclops Evolution, this call *will* mess up your DLDI driver!
 	dsCardData data2;
@@ -209,12 +210,23 @@ void hwBackup3in1()
 	data2.data[1] = 0;
 	data2.data[2] = size;
 	data2.data[3] = 0xffff00ff;
+	// We need to write the reboot flags to NOR, and we can only write in 32kB-blocks, at aligned offsets.
+	// Therefore we prepare a bigger block and copy lots of data now.
 	memcpy(&data2.name[0], &nds.gameTitle[0], 12);
-	WriteSram(0x0a000000, (u8*)&data2, sizeof(data2));
-	char txt[128];
-	sprintf(txt, "%.12s", &nds.gameTitle[0]);
+	memset(data, 0, 0x8000);
+	memcpy(&data[0x1000], (u8*)&data2, sizeof(data2));
+	uint32 ime = hwGrab3in1();
+	WriteNorFlash(0, data, 0x8000); // this should work - but it does not!
+	hwRelease3in1(ime);
 	
-	displayMessage("Save has been written to 3in1.\nPlease power off and restart\nthis tool.");
+	displayMessage2A(STR_HW_3IN1_PLEASE_REBOOT, false);
+	
+	ime = hwGrab3in1();
+	ReadNorFlash((u8*)&data2, 0x1000, sizeof(data2)); // this should work - but it does not!
+	hwRelease3in1(ime);
+	char txt[128];
+	sprintf(txt, "%.12s", &data2.name[0]);
+	displayMessage(txt);
 
 	while(1) {};
 }
@@ -223,27 +235,33 @@ void hwDump3in1(uint32 size, const char *gamename)
 {
 	u32 size_blocks = 1 << max(0, (uint8(size) - 18));
 
+	displayMessageA(STR_HW_SELECT_FILE_OW);
+	
 	char path[256];
 	char fname[256] = "";
 	fileSelect("/", path, fname, 0, true, false);
 	if (!fname[0]) {
 		uint32 cnt = 0;
 		sprintf(fname, "/%s.%i.sav", gamename, cnt);
+		char txt[256];
+		sprintf(txt, stringsGetMessageString(STR_HW_SEEK_UNUSED_FNAME), fname);
+		displayMessage2(txt, false);
 		while (fileExists(fname)) {
 			if (cnt < 65536)
 				cnt++;
 			else {
-				displayMessage("Unable to get a filename!\nThis means that you have more\nthan 65536 saves! (wow!)\nOops!");
+				displayMessage2A(STR_ERR_NO_FNAME, true);
 				while(1);
 			}
-			sprintf(fname, "/%s.%i.sav", gamename, cnt);
+			sprintf(fname, "%s.%i.sav", gamename, cnt);
 		}
 	}
-	char fullpath[512];
+	char fullpath[256];
 	sprintf(fullpath, "%s/%s", path, fname);
-	displayMessage(fname);
+	char txt[512];
+	sprintf(txt, stringsGetMessageString(STR_HW_3IN1_DUMP), fullpath);
+	displayMessage2(txt, false);
 
-	displayPrintState("Writing save to flash card");
 	FILE *file = fopen(fullpath, "wb");
 	if (size < 15)
 		size_blocks = 1;
@@ -259,7 +277,8 @@ void hwDump3in1(uint32 size, const char *gamename)
 	}
 	fclose(file);
 
-	displayPrintState("Done! Please power off...");
+	sprintf(txt, stringsGetMessageString(STR_HW_3IN1_DONE_DUMP), fullpath);
+	displayMessage2(txt, false);
 	while (1);
 }
 
@@ -268,24 +287,26 @@ void hwRestore3in1()
 	char path[256];
 	char fname[256];
 	memset(fname, 0, 256);
-	displayMessage("Please select a .sav file.");
+	displayMessageA(STR_HW_SELECT_FILE); // lower screen is used for file browser
 	fileSelect("/", path, fname, 0, false, false);
-	displayMessage("");
 	char msg[256];
-	sprintf(msg, "%s%s", path, fname);
+	sprintf(msg, "%s/%s", path, fname);
+	displayMessage(msg);
 	
 	FILE *file = fopen(msg, "rb");
 	uint32 size0 = fileSize(msg);
+	
 	uint8 size = 1;
+	// crude log2 function
 	while (size0 > (1 << size)) {
 		size++;
 	}
 	int size_blocks = 1 << max(0, int8(size) - 18); // ... in units of 0x40000 bytes - that's 256 kB
 	
+	displayMessage2A(STR_HW_3IN1_FORMAT_NOR, false);
 	hwFormatNor(1, size_blocks);
-	displayPrintState("Writing save to NOR");
 
-	// Read save and write it to NOR
+	displayMessage2A(STR_HW_3IN1_WRITE_NOR, false);
 	if (size < 15)
 		size_blocks = 1;
 	else
@@ -312,6 +333,7 @@ void hwRestore3in1()
 			while(1);
 		}
 	}
+	displayProgressBar(1, 1);
 	fclose(file);
 	free(test);
 	
@@ -323,6 +345,7 @@ void hwRestore3in1_b(uint32 size_file)
 	// Third, swap in a new game
 	uint32 size = auxspi_save_size_log_2();
 	while ((size_file < size) || flash_card) {
+		// TODO: make THIS error message more meaningful!
 		displayPrintState("File too small or no save chip!");
 		swap_cart();
 		size = auxspi_save_size_log_2();
@@ -331,12 +354,12 @@ void hwRestore3in1_b(uint32 size_file)
 	
 	uint8 type = auxspi_save_type();
 	if (type == 3) {
-		displayPrintState("Formating Flash chip");
+		displayMessage2A(STR_HW_FORMAT_GAME, false);
 		auxspi_erase();
 	}
 
 	// And finally, write the save!
-	displayPrintState("Restoring save");
+	displayMessage2A(STR_HW_WRITE_GAME, false);
 	u32 LEN = 0, num_blocks = 0, shift = 0;
 	switch (type) {
 	case 1:
@@ -364,8 +387,7 @@ void hwRestore3in1_b(uint32 size_file)
 	}
 	displayProgressBar(1, 1);
 
-	
-	displayPrintState("Done! Please turn your DS off...");
+	displayMessage2A(STR_HW_3IN1_RESTORE, false);
 	
 	while (1) {};
 }
@@ -373,10 +395,10 @@ void hwRestore3in1_b(uint32 size_file)
 // ------------------------------------------------------------
 void hwErase()
 {
-	displayMessage("This will WIPE OUT your entire\nsave! ARE YOU SURE?\n\nPress R+up+Y to confim!");
+	displayMessage2A(STR_HW_WARN_DELETE, true);
 	while (!(keysCurrent() & (KEY_UP | KEY_R | KEY_Y))) {};
 	auxspi_erase();
-	displayMessage("Done! Your save is gone!");
+	displayMessage2A(STR_HW_DID_DELETE, true);
 	while(1);
 }
 
@@ -431,7 +453,7 @@ void hwBackupFTP()
 	char fdir[256] = "";
 	char fname[256] ="";
 	memset(fname, 0, 256);
-	displayMessage("Please select a file name to\noverwrite, or press L+R in a\nfolder to create a new file.");
+	displayMessageA(STR_HW_SELECT_FILE_OW);
 	displayPrintState("FTP: dir");
 	fileSelect("/", fdir, fname, buf, true, false);
 	bool newfile;
@@ -443,17 +465,19 @@ void hwBackupFTP()
 	// Third: get a new target filename
 	FtpChdir(fdir, buf);
 	if (!fname[0]) {
-		displayMessage("Looking for an unused filename");
 		sNDSHeader nds;
 		cardReadHeader((u8*)&nds);
 		uint32 cnt = 0;
 		int tsize = 0;
 		sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
 		while (FtpSize(fname, &tsize, FTPLIB_IMAGE, buf) != 0) {
+		char txt[256];
+			sprintf(txt, stringsGetMessageString(STR_HW_SEEK_UNUSED_FNAME), fname);
+			displayMessage2(txt, false);
 			if (cnt < 65536)
 				cnt++;
 			else {
-				displayMessage("Unable to get a filename!\nThis means that you have more\nthan 65536 saves! (wow!)\nOops!");
+				displayMessage2A(STR_ERR_NO_FNAME, true);
 				while(1);
 			}
 			sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
@@ -473,29 +497,30 @@ void hwBackupFTP()
 		displayProgressBar(i+1, (size_blocks << 6));
 		auxspi_read_data(i << 9, (u8*)&data[0], length, type);
 		int out = 0;
+		int debug = 0;
 		while (out < 512) {
 			out += FtpWrite((u8*)&data[out], 512-out, ndata);
-			if (out < 512)
-				displayPrintState("!!!");
-			else
+			if (out < 512) {
+				displayPrintState(stringsGetMessageString(STR_HW_FTP_SLOW));
+				/*
+				debug++;
+				if (debug >= 2048) {
+					debug = 0;
+					displayMessage2("Unable to reach FTP server. Make sure that you have WRITE ACCESS!"
+				}
+				*/
+			} else {
 				displayPrintState("");
+			}
 		}
-		/*
-	    if ((out = FtpWrite((u8*)&data[0], length, ndata)) < length) {
-			char dings[512];
-			sprintf(dings, "Error: wrote %i, got %i", length, out);
-			displayPrintState(dings);
-			while(1);
-		}
-		*/
 	}
 	FtpClose(ndata);
 	FtpQuit(ndata);
 	
 	Wifi_DisconnectAP();
 
-	displayMessage("Done! Please turn off your DS.");
-	while(1);
+	//displayMessage("Done! Please turn off your DS.");
+	//while(1);
 }
 
 void hwRestoreFTP()
@@ -595,7 +620,7 @@ void hwRestoreFTP()
 		while (in < 512) {
 			in += FtpRead((u8*)&pdata[in], 512-in, ndata);
 			if (in < 512)
-				displayPrintState("!!!");
+				displayPrintState(stringsGetMessageString(STR_HW_FTP_SLOW));
 			else
 				displayPrintState("");
 		}
@@ -613,7 +638,6 @@ void hwRestoreFTP()
 			//char bums[512];
 			//sprintf(bums, "addr = %x", (i << 9)+(j << shift));
 			displayPrintState("Writing save (insecure!)");
-			//displayPrintState(bums);
 			for (int j = 0; j < 1 << (9-shift); j++) {
 				auxspi_write_data((i << 9)+(j << shift), ((u8*)pdata)+(j<<shift), LEN, type);
 			}
@@ -637,6 +661,7 @@ void hwRestoreFTP()
 
 	Wifi_DisconnectAP();
 
+	// TODO: return to main procedure, so we can do more stuff
 	displayMessage("Done! Please turn off your DS.");
 	while(1);
 }
