@@ -126,7 +126,7 @@ GLOBALREF int FtpRename(const char *src, const char *dst, netbuf *nControl);
 GLOBALREF int FtpDelete(const char *fnm, netbuf *nControl);
 GLOBALREF void FtpQuit(netbuf *nControl);
 
-static int FtpSendCmd(const char *cmd, char expresp, netbuf *nControl);
+GLOBALREF int FtpSendCmd(const char *cmd, char expresp, netbuf *nControl);
 
 GLOBALREF int FtpAccessBuf(const char *path, int typ, int mode, netbuf *nControl,
     netbuf **nData);

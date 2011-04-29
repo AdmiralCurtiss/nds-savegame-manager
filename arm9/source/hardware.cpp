@@ -50,17 +50,8 @@
 
 using namespace std;
 
-uint32 boot;
-
 static u32 pitch = 0x40000;
 
-bool flash_card = true; // the homebrew will always start with a FC inserted
-bool with_infrared = false; // ... which does not have an IR device
-
-extern char ftp_ip[16];
-extern char ftp_user[64];
-extern char ftp_pass[64];
-extern int ftp_port;
 
 // ---------------------------------------------------------------------
 bool swap_cart()
@@ -75,34 +66,14 @@ bool swap_cart()
 		while (!swap) {
 			if (keysCurrent() & KEY_A) {
 				// identify hardware
+				slot_1_type = get_slot1_type();
 				sysSetBusOwners(true, true);
 				cardReadHeader((u8*)&nds);
-				flash_card = false;
+				//flash_card = false;
 				displayPrintUpper();
 				if (!nds.gameTitle[0])
 					continue;
 				
-				// Look for an IR-enabled game cart first. If the save size returns something
-				//  nonzero, we hae found an IR-enabled game and we are done. If there is no
-				//  IR device present, "size2" is always zero.
-				with_infrared = true;
-				uint32 size2 = auxspi_save_size_log_2();
-				if (size2) {
-					flash_card = false;
-					return true;
-				}
-			
-				// Second, test if this is a Flash Card, which has no save chip. Therefore,
-				//  trying to identify this without IR-specific functions again returns zero.
-				with_infrared = false;
-				uint32 size1 = auxspi_save_size_log_2();
-				if (!size1) {
-					flash_card = true;
-					return true;
-				}
-			
-				// No special hardware found, so it must be a regular game.
-				flash_card = false;
 				return true;
 			}
 		}
@@ -111,9 +82,18 @@ bool swap_cart()
 	return true;
 }
 
-bool is_flash_card()
+u32 get_slot1_type()
 {
-	return flash_card;
+	u8 size1 = auxspi_save_size_log_2(false);
+	u8 size2 = auxspi_save_size_log_2(true);
+	
+	if (size1 == size2)
+		return 2; // flash card
+	
+	if ((size1 == 0) && (size2 != 0))
+		return 1; // ir device
+	
+	return 0; // regular game
 }
 
 bool swap_card_game(uint32 size)
@@ -344,7 +324,7 @@ void hwRestore3in1_b(uint32 size_file)
 {
 	// Third, swap in a new game
 	uint32 size = auxspi_save_size_log_2();
-	while ((size_file < size) || flash_card) {
+	while ((size_file < size) || (slot_1_type == 2)) {
 		// TODO: make THIS error message more meaningful!
 		displayPrintState("File too small or no save chip!");
 		swap_cart();
@@ -403,7 +383,7 @@ void hwErase()
 }
 
 // ------------------------------------------------------------
-void hwBackupFTP()
+void hwBackupFTP(bool dlp)
 {
 	netbuf *buf, *ndata;
 	int j;
@@ -411,7 +391,8 @@ void hwBackupFTP()
 
 	// Dump save and write it to FTP server
 	// First: swap card
-	swap_cart();
+	if (!dlp)
+		swap_cart();
 	displayPrintUpper();
 	uint8 size = auxspi_save_size_log_2();
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
@@ -497,7 +478,6 @@ void hwBackupFTP()
 		displayProgressBar(i+1, (size_blocks << 6));
 		auxspi_read_data(i << 9, (u8*)&data[0], length, type);
 		int out = 0;
-		int debug = 0;
 		while (out < 512) {
 			out += FtpWrite((u8*)&data[out], 512-out, ndata);
 			if (out < 512) {
@@ -519,11 +499,13 @@ void hwBackupFTP()
 	
 	Wifi_DisconnectAP();
 
-	//displayMessage("Done! Please turn off your DS.");
-	//while(1);
+	if (dlp) {
+		displayMessage("Done! Please turn off your DS.");
+		while(1);
+	}
 }
 
-void hwRestoreFTP()
+void hwRestoreFTP(bool dlp)
 {
 	netbuf *buf, *ndata;
 	int j;
@@ -568,10 +550,10 @@ void hwRestoreFTP()
 	fileSelect("/", fdir, fname, buf, true, false);
 	
 	// Third: swap card
-	swap_cart();
+	if (!dlp)
+		swap_cart();
 	displayPrintUpper();
 	uint8 size = auxspi_save_size_log_2();
-	int size_blocks = 1 << (size - 9); // ... in units of 512 bytes
 	uint8 type = auxspi_save_type();
 
 	// Fourth: read file
@@ -661,9 +643,10 @@ void hwRestoreFTP()
 
 	Wifi_DisconnectAP();
 
-	// TODO: return to main procedure, so we can do more stuff
-	displayMessage("Done! Please turn off your DS.");
-	while(1);
+	if (dlp) {
+		displayMessage("Done! Please turn off your DS.");
+		while(1);
+	}
 }
 
 // ------------------------------------------------------------
@@ -722,14 +705,10 @@ void hwRestoreGBA()
 		return;
 	}
 	
-	//char fullname[512];
-	
 	uint32 size = gbaGetSaveSize(type);
-	u8 nbanks = 2;
 	
 	char path[256];
 	char fname[256] = "";
-	char *gamename = (char*)0x080000a0;
 	fileSelect("/", path, fname, 0);
 	char fullpath[512];
 	sprintf(fullpath, "%s/%s", path, fname);

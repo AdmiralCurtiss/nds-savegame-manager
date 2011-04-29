@@ -205,7 +205,7 @@ uint32 gbaGetSaveSize(uint8 type)
 }
 
 // local function
-#define E_DEBUG
+//#define E_DEBUG
 void gbaEepromRead8Bytes(u8 *out, u32 addr, bool short_addr = false)
 {
 	// waitstates
@@ -318,7 +318,7 @@ bool gbaReadSave(u8 *dst, u8 src, u32 len, u8 type)
 	switch (type) {
 	case 1: {
 		// FIXME: this does not work yet...
-		u32 start, end;
+		int start, end;
 		start = src >> 3;
 		end = (src + len - 1) >> 3;
 		u8 *tmp = (u8*)malloc((end-start+1) << 3);
@@ -337,10 +337,10 @@ bool gbaReadSave(u8 *dst, u8 src, u32 len, u8 type)
 		}
 	case 3: {
 		// SRAM: blind copy
-		u32 start = 0x0a000000 + src;
+		int start = 0x0a000000 + src;
 		u8 *tmpsrc = (u8*)start;
 		sysSetBusOwners(true, true);
-		for (int i = 0; i < len; i++, tmpsrc++, dst++)
+		for (u32 i = 0; i < len; i++, tmpsrc++, dst++)
 			*dst = *tmpsrc;
 		break;
 		}
@@ -369,11 +369,12 @@ bool gbaReadSave(u8 *dst, u8 src, u32 len, u8 type)
 			}
 			u8 *tmpsrc = (u8*)start;
 			sysSetBusOwners(true, true);
-			for (int i = 0; i < sublen; i++, tmpsrc++, dst++)
+			for (u32 i = 0; i < sublen; i++, tmpsrc++, dst++)
 				*dst = *tmpsrc;
 		}
 		break;
 	}
+	return true;
 }
 
 bool gbaIsAtmel()
@@ -418,7 +419,7 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 		u32 start = 0x0a000000 + src;
 		u8 *tmpsrc = (u8*)start;
 		sysSetBusOwners(true, true);
-		for (int i = 0; i < len; i++, tmpsrc++, dst++)
+		for (u32 i = 0; i < len; i++, tmpsrc++, dst++)
 			*tmpsrc = *dst;
 			swiDelay(10); // mabe we don't need this, but better safe than sorry
 		break;
@@ -429,7 +430,7 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 			// only 64k, no bank switching required
 			u32 len7 = len >> 7;
 			u8 *tmpsrc = (u8*)(0x0a000000+src);
-			for (int j = 0; j < len7; j++) {
+			for (u32 j = 0; j < len7; j++) {
 				u32 ime = enterCriticalSection();
 				*(u8*)0x0a005555 = 0xaa;
 				swiDelay(10);
@@ -473,7 +474,7 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 			}
 			u8 *tmpsrc = (u8*)start;
 			sysSetBusOwners(true, true);
-			for (int i = 0; i < sublen; i++, tmpsrc++, dst++) {
+			for (u32 i = 0; i < sublen; i++, tmpsrc++, dst++) {
 				// we need to wait a few cycles before the hardware reacts!
 				*(u8*)0x0a005555 = 0xaa;
 				swiDelay(10);
@@ -490,6 +491,7 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 		}
 		break;
 	}
+	return true;
 }
 
 bool gbaFormatSave(u8 type)

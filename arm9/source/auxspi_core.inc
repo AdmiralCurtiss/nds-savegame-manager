@@ -3,7 +3,7 @@
  *  DS cartridges. Nintendo DS and all derivative names are trademarks
  *  by Nintendo. EZFlash 3-in-1 is a trademark by EZFlash.
  *
- * auxspi.cpp: A thin reimplementation of the AUXSPI protocol
+ * auxspi_core.inc: A thin reimplementation of the AUXSPI protocol
  *   (low level functions)
  *
  * Copyright (C) Pokedoc (2010)
@@ -26,7 +26,8 @@
 
 #include <nds.h>
 
-extern int ir_delay;
+#include "globals.h"
+
 
 inline void auxspi_wait_busy()
 {

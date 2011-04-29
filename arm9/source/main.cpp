@@ -48,8 +48,7 @@
 
 #include "libini.h"
 
-u8 *data;
-u32 size_buf;
+#include "globals.h"
 
 using std::max;
 
@@ -60,12 +59,6 @@ bool gba = 0;
 uint32 mode = 0;
 bool slot2 = false;
 u8 gbatype = 0;
-
-char ftp_ip[16] = "ftp_ip";
-char ftp_user[64] = "ftp_user";
-char ftp_pass[64] = "ftp_pass";
-int ftp_port = 0;
-int ir_delay = 1000;
 
 char bootdir[256] = "/";
 
@@ -80,6 +73,11 @@ void mode_dsi()
 	displayPrintUpper();
 	displayPrintLower();
 	
+
+	// DSi mode, does nothing at the moment
+	displayPrintState("DSi mode - still unsupported!");
+	while (1);
+
 	touchPosition touchXY;
 	while(1) {
 		swiWaitForVBlank();
@@ -102,10 +100,6 @@ void mode_dsi()
 			hwErase();
 		}
 	}
-
-	// DSi mode, does nothing at the moment
-	displayPrintState("DSi mode - still unsupported!");
-	while (1);
 }
 
 void mode_slot2()
@@ -255,6 +249,38 @@ void mode_wifi()
 	}
 }
 
+void mode_dlp()
+{
+	// use 3in1 to buffer data
+	displayPrintState("");
+	displayPrintUpper();
+	displayPrintLower();
+	
+	touchPosition touchXY;
+	while(1) {
+		swiWaitForVBlank();
+		touchRead(&touchXY);
+		
+		// backup
+		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
+			hwBackupFTP(true);
+		}
+		
+		// restore
+		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
+			hwRestoreFTP(true);
+		}
+		
+		// erase
+		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
+			displayPrintUpper();
+			hwErase();
+			displayMessage("Done! Please turn off your DS.");
+			while(1);
+		}
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	sysSetBusOwners(true, true);
@@ -263,6 +289,7 @@ int main(int argc, char* argv[])
 	displayInit();
 	
 	// Init DLDI (file system driver)
+	// TODO: find some way to skip this when loading from a different exploit/download play/not a flash card
 	int fat = fatInitDefault();
 	if (fat == 0) {
 		displayPrintState("DLDI error\n");
@@ -334,6 +361,9 @@ int main(int argc, char* argv[])
 	}
 	data = (u8*)malloc(size_buf);
 
+	// is there a game card in slot-1? if so, we have been starten with download-play or a new exploit
+	slot_1_type = get_slot1_type();
+
 	// don't try to identify Slot-2 in DSi mode.
 	if (dstype == 0) {
 		//displayPrintState("ID: Slot 2");
@@ -351,8 +381,13 @@ int main(int argc, char* argv[])
 	// Try to identify slot-2 device. Try opening slot-2 root directory
 	if (argv[0][3] == '2')
 		slot2 = true;
-	
-	if (dstype == 1) {
+		
+	// okay, we got our HW identified; now branch to the corresponding main function/event handler
+	if (slot_1_type != 2) {
+		// running from download play, NOR, or a different exploit. enter dlp mode.
+		mode = 5;
+		mode_dlp();
+	} else if (dstype == 1) {
 		// DSi/DSiXL, branch to SD-card mode when cracked.
 		mode = 3;
 		mode_dsi();

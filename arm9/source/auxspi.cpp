@@ -25,15 +25,14 @@
  */
 
 #include "auxspi.h"
-#include "auxspi_core.cpp"
 #include "hardware.h"
+#include "globals.h"
 
 #include <algorithm>
 
 using std::max;
 
-extern u8 *data;
-extern u32 size_buf;
+#include "auxspi_core.inc"
 
 
 // ========================================================
@@ -82,10 +81,10 @@ uint8 type2_size()
 
 // ========================================================
 
-uint8 auxspi_save_type()
+uint8 auxspi_save_type(bool ir)
 {
-	uint32 jedec = auxspi_save_jedec_id(); // 9f
-	int8 sr = auxspi_save_status_register(); // 05
+	uint32 jedec = auxspi_save_jedec_id(ir); // 9f
+	int8 sr = auxspi_save_status_register(ir); // 05
 	
 	if ((sr & 0xfd) == 0xF0 && (jedec == 0x00ffffff)) return 1;
 	if ((sr & 0xfd) == 0x00 && (jedec == 0x00ffffff)) return 2;
@@ -94,12 +93,12 @@ uint8 auxspi_save_type()
 	return 0;
 }
 
-uint32 auxspi_save_size()
+uint32 auxspi_save_size(bool ir)
 {
-	return 1 << auxspi_save_size_log_2();
+	return 1 << auxspi_save_size_log_2(ir);
 }
 
-uint8 auxspi_save_size_log_2()
+uint8 auxspi_save_size_log_2(bool ir)
 {
 	uint8 type = auxspi_save_type();
 	switch (type) {
@@ -110,17 +109,18 @@ uint8 auxspi_save_size_log_2()
 		return type2_size();
 		break;
 	case 3:
-		return jedec_table(auxspi_save_jedec_id());
+		return jedec_table(auxspi_save_jedec_id(ir));
 		break;
 	default:
 		return 0;
 	}
 }
 
-uint32 auxspi_save_jedec_id()
+uint32 auxspi_save_jedec_id(bool ir)
 {
 	uint32 id = 0;
-	auxspi_disable_infrared();
+	if (ir)
+		auxspi_disable_infrared();
 	auxspi_open(0);
 	auxspi_write(0x9f);
 	id |= auxspi_read() << 16;
@@ -130,10 +130,11 @@ uint32 auxspi_save_jedec_id()
 	return id;
 }
 
-uint8 auxspi_save_status_register()
+uint8 auxspi_save_status_register(bool ir)
 {
 	uint8 sr = 0;
-	auxspi_disable_infrared();
+	if (ir)
+		auxspi_disable_infrared();
 	auxspi_open(0);
 	auxspi_write(0x05);
 	sr = auxspi_read();
@@ -141,14 +142,15 @@ uint8 auxspi_save_status_register()
 	return sr;
 }
 
-void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type)
+void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type, bool ir)
 {
 	if (type == 0)
-		type = auxspi_save_type();
+		type = auxspi_save_type(ir);
 	if (type == 0)
 		return;
 
-	auxspi_disable_infrared();
+	if (ir)
+		auxspi_disable_infrared();
 	auxspi_open(0);
 	auxspi_write(0x03 | ((type == 1) ? addr>>8<<3 : 0));
 
@@ -170,7 +172,7 @@ void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type)
 	auxspi_close();
 }
 
-void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type)
+void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type, bool ir)
 {
 /*
 	if (type == 0)
@@ -189,13 +191,15 @@ void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type)
 	// we can only write a finite amount of data at once, so we need a separate loop
 	//  for multiple passes.
 	while (addr < addr_end) {
-		auxspi_disable_infrared();
+		if (ir)
+			auxspi_disable_infrared();
 		auxspi_open(0);
 		// set WEL (Write Enable Latch)
 		auxspi_write(0x06);
 		auxspi_close_lite();
 		
-		auxspi_disable_infrared();
+		if (ir)
+			auxspi_disable_infrared();
 		auxspi_open(0);
 		// send initial "write" command
         if(type == 1) {
@@ -222,7 +226,8 @@ void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type)
 		// wait for programming to finish
 		//auxspi_wait_wip();
 		// wait programming to finish
-		auxspi_disable_infrared();
+		if (ir)
+			auxspi_disable_infrared();
 		auxspi_open(0);
 		auxspi_write(5);
 		do { REG_AUXSPIDATA = 0; auxspi_wait_busy(); } while (REG_AUXSPIDATA & 0x01);	// WIP (Write In Progress) ?
@@ -233,29 +238,30 @@ void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type)
 
 void auxspi_disable_infrared()
 {
-	if (with_infrared)
-		auxspi_disable_infrared_core();
+	auxspi_disable_infrared_core();
 }
 
 bool auxspi_has_infrared()
 {
-	return with_infrared;
+	return (slot_1_type == 1);
 }
 
-void auxspi_erase()
+void auxspi_erase(bool ir)
 {
 	uint8 type = auxspi_save_type();
 	if (type == 3) {
 		uint8 size;
 		size = 1 << (auxspi_save_size_log_2() - 16);
 		for (int i = 0; i < size; i++) {
-			auxspi_disable_infrared();
+			if (ir)
+				auxspi_disable_infrared();
 			auxspi_open(0);
 			// set WEL (Write Enable Latch)
 			auxspi_write(0x06);
 			auxspi_close_lite();
 			
-			auxspi_disable_infrared();
+			if (ir)
+				auxspi_disable_infrared();
 			auxspi_open(0);
 			auxspi_write(0xd8);
 			auxspi_write(i);
@@ -265,7 +271,8 @@ void auxspi_erase()
 			
 			// wait for programming to finish
 			//auxspi_wait_wip();
-			auxspi_disable_infrared();
+			if (ir)
+				auxspi_disable_infrared();
 			auxspi_open(0);
 			auxspi_write(5);
 			do { REG_AUXSPIDATA = 0; auxspi_wait_busy(); } while (REG_AUXSPIDATA & 0x01);	// WIP (Write In Progress) ?
@@ -281,6 +288,7 @@ void auxspi_erase()
 	}
 }
 
+/*
 void auxspi_wait_wip()
 {
 	auxspi_disable_infrared();
@@ -292,3 +300,4 @@ void auxspi_wait_wip()
 	} while (sr & 0x01);
 	auxspi_close();
 }
+*/

@@ -34,11 +34,11 @@
 #include "hardware.h"
 #include "fileselect.h"
 #include "gba.h"
-
-#include "auxspi_core.cpp"
-
 #include "globals.h"
 #include "strings.h"
+
+#include "auxspi_core.inc"
+
 
 PrintConsole upperScreen;
 PrintConsole lowerScreen;
@@ -60,7 +60,7 @@ void displayInit()
 	consoleInit(&lowerScreen, 3,BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
 
 	consoleSelect(&upperScreen);
-	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.4 Beta\nBy Pokedoc");
+	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.5 semi-stable\nBy Pokedoc");
 	
 	displayPrintState("Press (B) to continue");
 	while (!(keysCurrent() & KEY_B));
@@ -100,10 +100,10 @@ void displayPrintUpper()
 	consoleClear();
 	
 	// fetch cartridge header (maybe, calling "cardReadHeader" on a FC messes with libfat!)
-	bool flash_card = is_flash_card();
-	bool ir = auxspi_has_infrared();
+	//bool flash_card = is_flash_card();
+	//bool ir = auxspi_has_infrared();
 	sNDSHeader nds;
-	if (!flash_card)
+	if (slot_1_type != 2)
 		cardReadHeader((uint8*)&nds);
 	// search for the correct header
 	/*
@@ -143,6 +143,12 @@ void displayPrintUpper()
 	case 4:
 		sprintf(&name[0], "Slot 2");
 		break;
+	case 5:
+		sprintf(&name[0], "Download Play");
+		break;
+	default:
+		sprintf(&name[0], "* Unknown *");
+		break;
 	}
 	consoleClear();
 	iprintf("%s", name);
@@ -150,7 +156,7 @@ void displayPrintUpper()
 	// 1) The cart id.
 	consoleSetWindow(&upperScreen, 10, 2, 22, 1);
 	sprintf(&name[0], "----");
-	if (flash_card) {
+	if (slot_1_type == 2) {
 		sprintf(&name[0], "Flash Card");
 	} else /*if (nds.gameCode[0])*/ {
 		memcpy(&name[0], &nds.gameCode[0], 4);
@@ -162,7 +168,7 @@ void displayPrintUpper()
 	// 2) The cart name.
 	consoleSetWindow(&upperScreen, 10, 3, 22, 1);
 	sprintf(&name[0], "----");
-	if (flash_card) {
+	if (slot_1_type == 2) {
 		sprintf(&name[0], "Flash Card");
 	} else /*if (nds.gameTitle[0])*/ {
 		memcpy(&name[0], &nds.gameTitle[0], 12);
@@ -174,7 +180,7 @@ void displayPrintUpper()
 	// 3) The save type
 	consoleSetWindow(&upperScreen, 10, 4, 22, 1);
 	sprintf(&name[0], "----");
-	if (flash_card) {
+	if (slot_1_type == 2) {
 		sprintf(&name[0], "Flash Card");
 	} else {
 		uint8 type = auxspi_save_type();
@@ -202,7 +208,7 @@ void displayPrintUpper()
 	consoleClear();
 	memset(&name[0], 0, MAXPATHLEN);
 	//if (auxspi_has_infrared()) {
-	if (ir) {
+	if (slot_1_type == 1) {
 		sprintf(&name[0], "Infrared");
 	} else {
 		sprintf(&name[0], "----");

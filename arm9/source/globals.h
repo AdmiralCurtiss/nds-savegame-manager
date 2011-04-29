@@ -26,10 +26,18 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
-// TODO
-//#define NDS_HEADER *(sNDSHeader*) 0x023ffe00
+#include <nds.h>
 
 extern u8 *data;
 extern u32 size_buf;
+
+extern u32 slot_1_type;
+
+extern char ftp_ip[16];
+extern char ftp_user[64];
+extern char ftp_pass[64];
+extern int ftp_port;
+
+extern int ir_delay;
 
 #endif // GLOBALS_H

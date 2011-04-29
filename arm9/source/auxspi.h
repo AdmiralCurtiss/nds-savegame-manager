@@ -34,16 +34,16 @@
 
 extern bool with_infrared;
 
-uint8 auxspi_save_type();
-uint32 auxspi_save_size();
-uint8 auxspi_save_size_log_2();
-uint32 auxspi_save_jedec_id();
-uint8 auxspi_save_status_register();
-void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type = 0);
-void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type = 0);
+uint8 auxspi_save_type(bool ir = false);
+uint32 auxspi_save_size(bool ir = false);
+uint8 auxspi_save_size_log_2(bool ir = false);
+uint32 auxspi_save_jedec_id(bool ir = false);
+uint8 auxspi_save_status_register(bool ir = false);
+void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type = 0, bool ir = false);
+void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type = 0, bool ir = false);
 void auxspi_disable_infrared();
-void auxspi_erase();
-void auxspi_wait_wip();
+void auxspi_erase(bool ir = false);
+//void auxspi_wait_wip();
 
 bool auxspi_has_infrared();
 //void auxspi_gpio_init_save();

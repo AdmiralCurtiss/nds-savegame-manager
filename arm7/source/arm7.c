@@ -82,7 +82,7 @@ int main() {
 
 	setPowerButtonCB(powerButtonCB);   
 
-	u32 ime = 0;
+	//u32 ime = 0;
 	// Keep the ARM7 mostly idle
 	while (!exitflag) {
 		if ( 0 == (REG_KEYINPUT & (KEY_SELECT | KEY_START | KEY_L | KEY_R))) {

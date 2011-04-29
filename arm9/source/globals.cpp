@@ -3,9 +3,9 @@
  *  DS cartridges. Nintendo DS and all derivative names are trademarks
  *  by Nintendo. EZFlash 3-in-1 is a trademark by EZFlash.
  *
- * hardware.h: header file for header.cpp
+ * globals.cpp: global varibles, defines etc.
  *
- * Copyright (C) Pokedoc (2010)
+ * Copyright (C) Pokedoc (2011)
  */
 /* 
  * This program is free software; you can redistribute it and/or modify 
@@ -23,51 +23,16 @@
  * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
-#ifndef HARDWARE_H
-#define HARDWARE_H
+#include "globals.h"
 
-#include <nds.h>
-#include <sys/unistd.h>
+u8 *data;
+u32 size_buf;
 
-#define RS_BACKUP 0x4b434142
+u32 slot_1_type = ~0;
 
-extern uint32 boot;
+char ftp_ip[16] = "ftp_ip";
+char ftp_user[64] = "ftp_user";
+char ftp_pass[64] = "ftp_pass";
+int ftp_port = 0;
 
-extern bool flash_card;
-
-struct dsCardData
-{
-	uint32 data[4];
-	char name[12];
-};
-
-void do_dump_nds_save_stage_1();
-void do_dump_nds_save_stage_2(int size);
-void do_restore_nds_save();
-
-bool swap_cart();
-u32 get_slot1_type();
-//bool is_flash_card();
-
-void hwBackup3in1();
-void hwDump3in1(uint32 size, const char *gamename);
-void hwRestore3in1();
-void hwRestore3in1_b(uint32 size_file);
-void hwErase();
-
-void hwBackupDSi();
-void hwRestoreDSi();
-
-void hwBackupFTP(bool dlp = false);
-void hwRestoreFTP(bool dlp = false);
-
-void hwBackupGBA(u8 type);
-void hwRestoreGBA();
-void hwEraseGBA();
-
-void hwFormatNor(uint32 page, uint32 count);
-
-uint32 hwGrab3in1();
-void hwRelease3in1(uint32 ime);
-
-#endif
+int ir_delay = 1000;

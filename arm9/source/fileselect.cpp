@@ -44,7 +44,7 @@ extern u8 *data;
 extern u32 size_buf;
 
 // ---------------------------------------------------------------------------------
-void ftpGetFileList(const char *dir, netbuf *ctrl, uint32 &num)
+void ftpGetFileList(const char *dir, netbuf *ctrl, int &num)
 {
 	char *buf = (char*)data;
 	memset(buf, 0, size_buf);
@@ -78,7 +78,7 @@ void ftpGetFileList(const char *dir, netbuf *ctrl, uint32 &num)
 	}
 }
 
-void fileGetFileList(const char *dir, uint32 &num)
+void fileGetFileList(const char *dir, int num)
 {
 	char *buf = (char*)data;
 	int idx = 0;
@@ -88,7 +88,6 @@ void fileGetFileList(const char *dir, uint32 &num)
 	struct dirent *pent;
 	num = 0;
 	pdir=opendir(dir);
-	char name[128];
 	if (pdir) {
 		while ((pent=readdir(pdir)) !=NULL) {
 			char fullname[256];
@@ -118,7 +117,7 @@ void fileGetFileList(const char *dir, uint32 &num)
 		closedir(pdir);
 }
 
-void filePrintFileList(const char *dir, uint32 first, uint32 select, uint32 count, bool cancel = false)
+void filePrintFileList(const char *dir, int first, int select, int count, bool cancel = false)
 {
 	if (select < first)
 		select = first;
@@ -128,18 +127,11 @@ void filePrintFileList(const char *dir, uint32 first, uint32 select, uint32 coun
 	consoleClear();
 
 	char *buf = (char*)data;
-	int idx = 0;
-	int len = strlen(buf);
 	for (int i = 0; i < first; i++) {
 		buf = strchr(buf, '\n') + 1;
 	}
 
-	for (uint32 i = first; (i < first + 18) && (i < count); i++) {
-		struct stat statbuf;
-		char dir;
-		u32 size;
-		char fname[128];
-		char fname2[128];
+	for (int i = first; (i < first + 18) && (i < count); i++) {
 		char *newline = strchr(buf, '\n');
 		int linelen = newline - buf;
 		
@@ -177,9 +169,9 @@ void fileSelect(const char *startdir, char *out_dir, char *out_fname, netbuf *bu
 	bool select = false;
 	static int size_list = 18;
 	
-	uint32 num_files = 0;
-	uint32 sel_file = 0;
-	uint32 first_file = 0;
+	int num_files = 0;
+	int sel_file = 0;
+	int first_file = 0;
 	
 	// get list of files in current dir
 	if (buf)
@@ -210,8 +202,6 @@ void fileSelect(const char *startdir, char *out_dir, char *out_fname, netbuf *bu
 		} else if (keys & KEY_A) {
 			// get selected file name
 			char *buf2 = (char*)data;
-			int idx = 0;
-			int len = strlen(buf2);
 			char fname[128];
 			for (int i = 0; i < sel_file; i++) {
 				buf2 = strchr(buf2, '\n') + 1;
