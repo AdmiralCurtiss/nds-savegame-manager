@@ -78,11 +78,11 @@ void ftpGetFileList(const char *dir, netbuf *ctrl, int &num)
 	}
 }
 
-void fileGetFileList(const char *dir, int num)
+void fileGetFileList(const char *dir, int &num)
 {
 	char *buf = (char*)data;
 	int idx = 0;
-	memset(buf, 0, 0x8000);
+	memset(buf, 0, size_buf);
 	
 	DIR *pdir;
 	struct dirent *pent;
@@ -96,7 +96,7 @@ void fileGetFileList(const char *dir, int num)
 			stat(fullname, &statbuf);
 			
 			// TODO: check for buffer overflow!
-			if (idx + strlen(pent->d_name) < 0x8000-2) {
+			if (idx + strlen(pent->d_name) < size_buf-2) {
 				if (S_ISDIR(statbuf.st_mode)) {
 					int len = sprintf(buf, "d%s\n", pent->d_name);
 					buf += len;
@@ -178,6 +178,10 @@ void fileSelect(const char *startdir, char *out_dir, char *out_fname, netbuf *bu
 		ftpGetFileList("/", buf, num_files);
 	else
 		fileGetFileList(startdir, num_files);
+	if (num_files == 0) {
+		displayMessage("ERROR");
+		while(1);
+	}
 	filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
 		
 	while (!select) {

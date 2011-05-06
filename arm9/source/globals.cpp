@@ -35,4 +35,13 @@ char ftp_user[64] = "ftp_user";
 char ftp_pass[64] = "ftp_pass";
 int ftp_port = 0;
 
-int ir_delay = 1000;
+int ir_delay = 1200;
+
+char device[16] = "/";
+
+char txt[256] = "";
+
+u32 mode = 0;
+u32 ezflash = 0;
+
+int slot2 = 0;

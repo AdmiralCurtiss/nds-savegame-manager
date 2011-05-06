@@ -47,7 +47,17 @@ void do_restore_nds_save();
 
 bool swap_cart();
 u32 get_slot1_type();
-//bool is_flash_card();
+
+// This function was previously found in the main function.
+// Return values:
+//  0 - no special configuration, WiFi mode
+//  1 - GBA game in Slot 2
+//  2 - EZFlash 3in1 in Slot 2
+//  3 - running in DSi mode
+//  4 - running from Slot 2 flash card
+//  5 - running from download play or another exploit that does not need a flash card in Slot 1
+//
+u32 hwDetect();
 
 void hwBackup3in1();
 void hwDump3in1(uint32 size, const char *gamename);

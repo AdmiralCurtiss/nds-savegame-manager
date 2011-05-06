@@ -53,13 +53,6 @@
 using std::max;
 
 
-uint32 ezflash = 0;
-uint32 dstype = 0;
-bool gba = 0;
-uint32 mode = 0;
-bool slot2 = false;
-u8 gbatype = 0;
-
 char bootdir[256] = "/";
 
 
@@ -73,10 +66,9 @@ void mode_dsi()
 	displayPrintUpper();
 	displayPrintLower();
 	
-
 	// DSi mode, does nothing at the moment
-	displayPrintState("DSi mode - still unsupported!");
-	while (1);
+	displayMessage2A(STR_BOOT_MODE_UNSUPPORTED,true);
+	while(1);
 
 	touchPosition touchXY;
 	while(1) {
@@ -109,7 +101,7 @@ void mode_slot2()
 	displayPrintUpper();
 	displayPrintLower();
 	
-	displayMessage("This mode is DISABLED.\nPlease remove Slot-2 module\nand restart this tool.");
+	displayMessage2A(STR_BOOT_MODE_UNSUPPORTED,true);
 	while(1);
 	
 	touchPosition touchXY;
@@ -140,7 +132,6 @@ void mode_slot2()
 void mode_3in1()
 {
 	displayPrintUpper();
-	displayPrintLower();
 	
 	dsCardData data2;
 	uint32 ime = hwGrab3in1();
@@ -156,6 +147,9 @@ void mode_3in1()
 		hwFormatNor(0, 1); // clear reboot flag
 		hwDump3in1(size, name);
 	}
+	displayMessage("");
+	displayProgressBar(0,0);
+	displayPrintLower();
 	
 	touchPosition touchXY;
 	while(1) {
@@ -184,6 +178,10 @@ void mode_3in1()
 
 void mode_gba()
 {
+	// This function takes some time, since it needs to parse the entire GBA module
+	//  for a magic string. It is only called when truly necessary. (i.e. once for now)
+	u8 gbatype = gbaGetSaveType();
+	
 	// use 3in1 to buffer data
 	displayPrintState("");
 	gbatype = gbaGetSaveType();
@@ -251,7 +249,7 @@ void mode_wifi()
 
 void mode_dlp()
 {
-	// use 3in1 to buffer data
+	// use non-flash card based exploits (download play or Sudoku?). untested, and does not work yet!
 	displayPrintState("");
 	displayPrintUpper();
 	displayPrintLower();
@@ -275,45 +273,30 @@ void mode_dlp()
 		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
 			displayPrintUpper();
 			hwErase();
-			displayMessage("Done! Please turn off your DS.");
+			displayMessage2A(STR_HW_DID_DELETE, true);
 			while(1);
 		}
 	}
 }
 
-int main(int argc, char* argv[])
+bool loadIniFile(char* path)
 {
-	sysSetBusOwners(true, true);
-	
-	// Init the screens
-	displayInit();
-	
-	// Init DLDI (file system driver)
-	// TODO: find some way to skip this when loading from a different exploit/download play/not a flash card
-	int fat = fatInitDefault();
-	if (fat == 0) {
-		displayPrintState("DLDI error\n");
-		while (1) {};
-	}
-	
-	// test if our flash card supports argv at all. some R4 clones seem to be very picky!
-	//  (untested due to lack of an R4 myself, but I hope it works)
-	bool has_argv = false;
-	if (argc)
-		has_argv = true;
+	// Don't try to load ini file in DLP mode, we need to get our options from a different source.
+	//  Still trying to figure something out...
+	if (mode == 5)
+		return true;
+
+	ini_fd_t ini = 0;
 	
 	// load ini file...
-	ini_fd_t ini = 0;
 	char inipath[256];
-	if (has_argv) {
-		if (argv[0]) {
-			char *last = strrchr(argv[0], '/');
-			int len = (last - argv[0])+1;
-			strncpy(bootdir, argv[0], len);
-			sprintf(inipath, "%s/savegame_manager.ini", bootdir);
-			if (fileExists(inipath))
-				ini = ini_open(inipath, "r", "");
-		}
+	if (path) {
+		char *last = strrchr(path, '/');
+		int len = (last - path)+1;
+		strncpy(bootdir, path, len);
+		sprintf(inipath, "%s/savegame_manager.ini", bootdir);
+		if (fileExists(inipath))
+			ini = ini_open(inipath, "r", "");
 	}
 	if (!ini) {
 		sprintf(inipath, "/savegame_manager.ini");
@@ -321,8 +304,8 @@ int main(int argc, char* argv[])
 			ini = ini_open(inipath, "r", "");
 	}
 	if (!ini) {
-		displayMessage("Unable to open ini file!\nPlease make sure that it is\n1. in this apps folder, or"
-		  "\n2. in the root folder\nIf 1. does not work, use 2.");
+		// FIXME
+		displayMessage2A(STR_BOOT_NO_INI,true);
 		while (1);
 	}
 	
@@ -335,77 +318,116 @@ int main(int argc, char* argv[])
 	ini_readString(ini, ftp_pass, 64);
 	ini_locateKey(ini, "ftp_port");
 	ini_readInt(ini, &ftp_port);
-	ini_locateKey(ini, "ir_delay");
+	
+	ini_locateKey(ini, "ir_delay");	
 	ini_readInt(ini, &ir_delay);
 	ir_delay = max(ir_delay, 1000);
+	
+	ini_locateKey(ini, "slot2");
+	ini_readInt(ini, &slot2);
+	
 	ini_close(ini);
 	
 	// delete temp file (which is a remnant of inilib)
 	remove("/tmpfile");
 	
+	return true;
+}
+
+// This is a new attempt to reliably identify if the flash card has argv support or not,
+//  including R4 clones which may have *bad* argv support.
+bool has_argv(int argc, char* argv[])
+{
+	// no argv support
+	if (argc == 0)
+		return false;
+	
+	// bad argv support: if argc is larger than unity, your flash card can't even do
+	//  a proper negative indicator. let us test for 2 argv arguments, just to be safe.
+	if (argc > 2)
+		return false;
+	
+	/*
+	// test if argv[0] pointer is valid (scan main memory and WRAM)
+	if ((argv[0] < 0x02000000) || (argv[0] >= 0x04000000))
+		return false;
+	*/
+	
+	// test if argv[0] contains a valid string
+	char *arg0 = argv[0];
+	// test for possible "/path", "fat*:/path" and "sd:/*".
+	if (*arg0 == 'f')
+		if (strncasecmp(argv[0], "fat:/", 5) || strncasecmp(argv[0], "fat1:/", 6)
+			|| strncasecmp(argv[0], "fat2:/", 6))
+			return true;
+
+	if (*arg0 == 's')
+		if (strncasecmp(argv[0], "sd:/", 4))
+			return true;
+	
+	if (*arg0 == '/')
+		return true;
+	
+	return false;
+}
+
+int main(int argc, char* argv[])
+{
+	sysSetBusOwners(true, true);
+	
+	// Init the screens
+	displayInit();
+
+	// detect hardware
+	mode = hwDetect();
+	
+	// Init DLDI (file system driver), skip for mode == 4,5 which already calls this during
+	//  hardware initialisation
+	if (mode < 4) {
+		int fat = fatInitDefault();
+		if (fat == 0) {
+			displayMessage2A(STR_BOOT_DLDI_ERROR,true);
+			while (1);
+		}
+	}
+	
+	// Load the ini file with the FTP settings and more options
+	if (has_argv(argc, argv))
+		loadIniFile(argv[0]);
+	else
+		loadIniFile(0);
+
+	// prepare the global data buffer
+	data = (u8*)malloc(size_buf);
+	// This should not be required, but better safe than sorry. On the DS, it *might* be
+	//  possible that no continuous 2 MB are available.
+	if (data == NULL) {
+		size_buf >>= 1;
+		data = (u8*)malloc(size_buf);
+	}
+	
 	// load strings
 	stringsLoadFile(0);
-	
-	// Identify hardware and branch to corresponding mode
-	//displayMessage("Identifying hardware...");
-
-	// 1) Identify DSi (i.e. memory capacity)
-	//displayPrintState("ID: DS model");
-	if (isDsi()) {
-		dstype = 1;
-		size_buf = 1 << 23; // 8 MB
-	} else {
-		dstype = 0;
-		size_buf = 1 << 21; // 2 MB
-		//size_buf = 1 << 14; // 32 kB - TESTING ONLY!
-	}
-	data = (u8*)malloc(size_buf);
-
-	// is there a game card in slot-1? if so, we have been starten with download-play or a new exploit
-	slot_1_type = get_slot1_type();
-
-	// don't try to identify Slot-2 in DSi mode.
-	if (dstype == 0) {
-		//displayPrintState("ID: Slot 2");
-		uint32 ime = enterCriticalSection();
-		sysSetBusOwners(true, true);
-		OpenNorWrite();
-		ezflash = ReadNorFlashID();
-		CloseNorWrite();
-		leaveCriticalSection(ime);
-		chip_reset();
-
-		gba = gbaIsGame();
-	}
-	
-	// Try to identify slot-2 device. Try opening slot-2 root directory
-	if (argv[0][3] == '2')
-		slot2 = true;
 		
 	// okay, we got our HW identified; now branch to the corresponding main function/event handler
-	if (slot_1_type != 2) {
-		// running from download play, NOR, or a different exploit. enter dlp mode.
-		mode = 5;
-		mode_dlp();
-	} else if (dstype == 1) {
-		// DSi/DSiXL, branch to SD-card mode when cracked.
-		mode = 3;
-		mode_dsi();
-	} else if (slot2) {
-		mode = 4;
-		mode_slot2();
-	} else if (ezflash != 0) {
-		// DS with EZFlash found -> branch to 3in1 mode
-		mode = 2;
-		mode_3in1();
-	} else if (gba) {
-		// GBA game in slot 2 -> branch to GBA mode
-		mode = 1;
-		mode_gba();
-	} else {
-		// failsafe: enter WiFi mode
-		mode = 0;
-		mode_wifi();
+	switch (mode) {
+		case 1:
+			mode_gba();
+			break;
+		case 2:
+			mode_3in1();
+			break;
+		case 3:
+			mode_dsi();
+			break;
+		case 4:
+			mode_slot2();
+			break;
+		case 5:
+			mode_dlp();
+			break;
+		default:
+			mode_wifi();
 	}
 
 	return 0;

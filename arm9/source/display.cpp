@@ -37,15 +37,10 @@
 #include "globals.h"
 #include "strings.h"
 
-#include "auxspi_core.inc"
-
 
 PrintConsole upperScreen;
 PrintConsole lowerScreen;
 
-
-extern uint32 mode;
-extern u8 gbatype;
 
 
 //===========================================================
@@ -68,10 +63,15 @@ void displayInit()
 
 void displayPrintUpper()
 {
-	extern uint32 ezflash;
+	/*
+	//extern uint32 ezflash;
 	extern bool gba;
 	extern uint32 dstype;
 	extern bool slot2;
+	*/
+	bool gba = (mode == 1);
+	u32 dstype = (mode == 3) ? 1 : 0;
+	bool ir = (slot_1_type == 1) ? true : false;
 
 	// print upper screen (background)
 	consoleSelect(&upperScreen);
@@ -100,29 +100,9 @@ void displayPrintUpper()
 	consoleClear();
 	
 	// fetch cartridge header (maybe, calling "cardReadHeader" on a FC messes with libfat!)
-	//bool flash_card = is_flash_card();
-	//bool ir = auxspi_has_infrared();
 	sNDSHeader nds;
 	if (slot_1_type != 2)
 		cardReadHeader((uint8*)&nds);
-	// search for the correct header
-	/*
-	for (int i = 0; i < 0x1000000; i++)
-	{
-		char *test = (char*)0x02000000;
-		if ((test[0]=='C')&&(test[1]=='P')&&(test[2]=='U')&&(test[3]=='D')) {
-			iprintf("found!");
-			while(1);
-		}
-		test++;
-	}
-	*/
-	//nds = NDS_HEADER;
-	/*
-	if (nds.gameTitle[0] == 0xff)
-		// DSi
-		nds = NDS_HEADER;
-		*/
 	
 	char name[MAXPATHLEN];
 	// 0) print the mode
@@ -158,7 +138,7 @@ void displayPrintUpper()
 	sprintf(&name[0], "----");
 	if (slot_1_type == 2) {
 		sprintf(&name[0], "Flash Card");
-	} else /*if (nds.gameCode[0])*/ {
+	} else {
 		memcpy(&name[0], &nds.gameCode[0], 4);
 		name[4] = 0x00;
 	}
@@ -170,7 +150,7 @@ void displayPrintUpper()
 	sprintf(&name[0], "----");
 	if (slot_1_type == 2) {
 		sprintf(&name[0], "Flash Card");
-	} else /*if (nds.gameTitle[0])*/ {
+	} else {
 		memcpy(&name[0], &nds.gameTitle[0], 12);
 		name[12] = 0x00;
 	}
@@ -183,17 +163,17 @@ void displayPrintUpper()
 	if (slot_1_type == 2) {
 		sprintf(&name[0], "Flash Card");
 	} else {
-		uint8 type = auxspi_save_type();
-		uint32 size = auxspi_save_size();
+		uint8 type = auxspi_save_type(ir);
+		uint8 size = auxspi_save_size_log_2(ir);
 		switch (type) {
 		case 1:
 			sprintf(&name[0], "Eeprom (%i Bytes)", size);
 			break;
 		case 2:
-			sprintf(&name[0], "FRAM (%i kB)", size >> 10);
+			sprintf(&name[0], "FRAM (%i kB)", 1 << (size - 10));
 			break;
 		case 3:
-			sprintf(&name[0], "Flash (%i kB)", size >> 10);
+			sprintf(&name[0], "Flash (%i kB)", 1 << (size - 10));
 			break;
 		default:
 			sprintf(&name[0], "unknown");
@@ -207,7 +187,6 @@ void displayPrintUpper()
 	consoleSetWindow(&upperScreen, 10, 5, 22, 1);
 	consoleClear();
 	memset(&name[0], 0, MAXPATHLEN);
-	//if (auxspi_has_infrared()) {
 	if (slot_1_type == 1) {
 		sprintf(&name[0], "Infrared");
 	} else {
@@ -260,18 +239,18 @@ void displayPrintUpper()
 	if (ezflash)
 		sprintf(name, "SRAM");
 	else if (gba) {
-		u8 type = gbatype;
+		saveTypeGBA type = GetSlot2SaveType(CART_GBA_GAME);
 		u8 size = gbaGetSaveSizeLog2(type);
 		switch (type) {
-			case 1:
-			case 2:
+			case SAVE_GBA_EEPROM_05:
+			case SAVE_GBA_EEPROM_8:
 				sprintf(name, "EEPROM (%i bytes)", 1 << size);
 				break;
-			case 3:
+			case SAVE_GBA_SRAM_32:
 				sprintf(name, "SRAM (%i kB)", 1 << (size - 10));
 				break;
-			case 4:
-			case 5:
+			case SAVE_GBA_FLASH_64:
+			case SAVE_GBA_FLASH_128:
 				sprintf(name, "Flash (%i kB)", 1 << (size - 10));
 				break;
 			default:
@@ -292,7 +271,8 @@ void displayPrintUpper()
 	if (ezflash)
 		sprintf(name, "NOR + PSRAM");
 	else if (gba)
-		sprintf(name, "(unsupported)");
+		// TODO: test for RTC, add function for syncing RTC?
+		sprintf(name, "???");
 	else if (slot2)
 		sprintf(name, "----");
 	else if (dstype == 0)
@@ -416,6 +396,9 @@ void displayProgressBar(int cur, int max0)
   }
   buffer[31] = ']';
   buffer[32] = 0;
+  
+  if (max0 == 0)
+	buffer[0] = 0;
 
   iprintf("%s", buffer);
 }

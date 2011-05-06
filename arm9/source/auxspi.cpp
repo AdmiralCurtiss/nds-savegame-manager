@@ -248,10 +248,10 @@ bool auxspi_has_infrared()
 
 void auxspi_erase(bool ir)
 {
-	uint8 type = auxspi_save_type();
+	uint8 type = auxspi_save_type(ir);
 	if (type == 3) {
 		uint8 size;
-		size = 1 << (auxspi_save_size_log_2() - 16);
+		size = 1 << (auxspi_save_size_log_2(ir) - 16);
 		for (int i = 0; i < size; i++) {
 			if (ir)
 				auxspi_disable_infrared();
@@ -280,10 +280,10 @@ void auxspi_erase(bool ir)
 			auxspi_close();
 		}
 	} else {
-		int8 size = 1 << max(0, (auxspi_save_size_log_2() - 15));
+		int8 size = 1 << max(0, (auxspi_save_size_log_2(ir) - 15));
 		memset(data, 0, 0x8000);
 		for (int i = 0; i < size; i++) {
-			auxspi_write_data(i << 15, data, 0x8000, type);
+			auxspi_write_data(i << 15, data, 0x8000, type, ir);
 		}
 	}
 }

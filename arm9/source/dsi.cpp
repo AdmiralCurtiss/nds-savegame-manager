@@ -31,11 +31,7 @@
 
 bool isDsi()
 {
-#define SCFG_MODE    (*(vu8*)0x4004000)
-	if(SCFG_MODE)
-		return (REG_DSIMODE != 0) ? true : false;
-	
-	return false;
+	return (REG_DSIMODE != 0) ? true : false;
 }
 
 bool dsiUnlockSlot1()

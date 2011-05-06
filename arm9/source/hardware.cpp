@@ -25,6 +25,8 @@
  */
 
 #include <nds.h>
+#include <fat.h>
+
 #include <nds/interrupts.h>
 #include <nds/arm9/console.h>
 #include <sys/dir.h>
@@ -47,6 +49,7 @@
 
 #include "auxspi.h"
 #include "strings.h"
+#include "dsi.h"
 
 using namespace std;
 
@@ -54,6 +57,7 @@ static u32 pitch = 0x40000;
 
 
 // ---------------------------------------------------------------------
+// FIXME: after the slot 1 detection was factored out, swap_cart no longer has perfect accuracy!
 bool swap_cart()
 {
 	sNDSHeader nds;
@@ -67,9 +71,12 @@ bool swap_cart()
 			if (keysCurrent() & KEY_A) {
 				// identify hardware
 				slot_1_type = get_slot1_type();
+				// don't try to dump a flash card
+				if (slot_1_type == 2)
+					continue;
 				sysSetBusOwners(true, true);
+				// this will break DLDI on the Cyclops Evolution, but we need it anyway.
 				cardReadHeader((u8*)&nds);
-				//flash_card = false;
 				displayPrintUpper();
 				if (!nds.gameTitle[0])
 					continue;
@@ -84,16 +91,21 @@ bool swap_cart()
 
 u32 get_slot1_type()
 {
-	u8 size1 = auxspi_save_size_log_2(false);
+	sysSetBusOwners(true, true);
+
+	// Trying to read the save size in IR mode will fail on non-IR devices.
+	// If we have success, it is an IR device.
 	u8 size2 = auxspi_save_size_log_2(true);
+	if (size2 > 0)
+		return 1;
 	
-	if (size1 == size2)
-		return 2; // flash card
+	// It is not an IR game, so maybe it is a regular game.
+	u8 size1 = auxspi_save_size_log_2(false);
+	if (size1 > 0)
+		return 0;
 	
-	if ((size1 == 0) && (size2 != 0))
-		return 1; // ir device
-	
-	return 0; // regular game
+	// No save size test returned a save chip, so it must be a flash card.
+	return 2;
 }
 
 bool swap_card_game(uint32 size)
@@ -101,12 +113,74 @@ bool swap_card_game(uint32 size)
 	return false;
 }
 
+// This function is called on boot; it detects the hardware configuration and selects the mode.
+u32 hwDetect()
+{
+	// Identify Slot 1 devide. This is used by pretty much everything.
+	slot_1_type = get_slot1_type();
+
+	// First, look for a DSi running in DSi mode.
+	if (isDsi()) {
+		size_buf = 1 << 23; // 8 MB memory buffer
+		return 3;
+	}
+	size_buf = 1 << 21; // 2 MB memory buffer
+	
+	// Identify Slot 2 device.
+	// First, look for an EZFlash 3in1
+	uint32 ime = enterCriticalSection();
+	sysSetBusOwners(true, true);
+	OpenNorWrite();
+	ezflash = ReadNorFlashID();
+	CloseNorWrite();
+	leaveCriticalSection(ime);
+	chip_reset();
+	if (ezflash)
+		return 2;
+	
+	// Okay, maybe it is a regular GBA game instead
+	if (gbaIsGame())
+		return 1;
+	
+	// Maybe it is a Slot 2 flash card.
+
+	// Detecting slot 2 flash cards is very evil:
+	// - They don't usually support argv, so we can't simply test that we are
+	//  running from "fat2".
+	// - We need a passme compatible slot 1 device, i.e. we can't verify that
+	//  there is a flash card in slot 1 (which usually is).
+	// - There is only a limited number of Slot 2 flash cards on the market, so
+	//  we could test for this (I think there is a library for this). But if we
+	//  boot from Slot 1, a positive Slot 2 test does not mean that we did boot
+	//  from there - the card may be sitting there unused!
+	//
+	// --> So we select slot 2 mode the "dumb" way - with an ini parameter. Unless you swap
+	//  the same microSD card between Slot 1 and Slot 2, this should be the safest mode.
+	// (If you know a smarter way of doing this, feel free to commit a patch!)
+	//
+	if (slot2)
+		return 4;
+
+	// Try to identify download play mode. This also introduces various complications:
+	// - The latest libnds versions include code for the SD-slot on the DSi. It does not work
+	//  from flash cards or download play, but it may still result in a positive DLDI driver
+	//  initialisation. So we can't simply run "fatInitDefault" and test return values.
+	// - Currently, download play mode aims to "insert game first, then run dlp", i.e.
+	//  it does not support hotswapping the game. So we select this mode if there is *no*
+	//  flash card inserted in Slot 1.
+	//
+	if (slot_1_type != 2)
+		return 5;
+	
+	// Nothing unique found, so enter WiFi mode
+	return 0;
+}
+
 // --------------------------------------------------------
 void hwFormatNor(uint32 page, uint32 count)
 {
 	uint32 ime = hwGrab3in1();
 	SetSerialMode();
-	//displayPrintState("Formating NOR memory");
 	displayProgressBar(0, count);
 	for (uint32 i = page; i < page+count; i++) {
 		Block_Erase(i << 18);
@@ -139,9 +213,10 @@ void hwBackup3in1()
 	swap_cart();
 	displayPrintUpper();
 
-	uint8 size = auxspi_save_size_log_2();
+	bool ir = (slot_1_type == 1) ? true : false;
+	uint8 size = auxspi_save_size_log_2(ir);
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
-	uint8 type = auxspi_save_type();
+	uint8 type = auxspi_save_type(ir);
 
 	displayMessage2A(STR_HW_3IN1_FORMAT_NOR, false);
 	hwFormatNor(0, size_blocks+1);
@@ -152,26 +227,27 @@ void hwBackup3in1()
 	else
 		size_blocks = 1 << (uint8(size) - 15);
 	u8 *test = (u8*)malloc(0x8000);
+	if (test == NULL)
+		while(1);
 	u32 LEN = min(1 << size, 0x8000);
 	
 	for (int i = 0; i < size_blocks; i++) {
 		displayProgressBar(i+1, size_blocks);
-		auxspi_read_data(i << 15, data, LEN, type);
+		auxspi_read_data(i << 15, data, LEN, type, ir);
 		uint32 ime = hwGrab3in1();
 		SetSerialMode();
 		WriteNorFlash((i << 15) + pitch, data, LEN);
 		hwRelease3in1(ime);
-		for (int j = 0; j < 4; j++) {
-			uint32 ime = hwGrab3in1();
-			ReadNorFlash(test, (i << 15) + pitch, LEN);
-			hwRelease3in1(ime);
-		}
+		// test if NOR memory is sane, i.e. if we can read what we just wrote
+		ime = hwGrab3in1();
+		ReadNorFlash(test, (i << 15) + pitch, LEN);
+		hwRelease3in1(ime);
 		if (*((vuint16 *)(FlashBase+0x2002)) == 0x227E) {
-			displayMessage("ERROR: ID mode active!");
+			displayMessage2A(STR_HW_3IN1_ERR_IDMODE, false);
 			while(1);
 		}
 		if (memcmp(test, data, LEN)) {
-			displayMessage("ERROR: verifying NOR failed");
+			displayMessage2A(STR_HW_3IN1_ERR_NOR, false);
 			while(1);
 		}
 	}
@@ -201,13 +277,6 @@ void hwBackup3in1()
 	
 	displayMessage2A(STR_HW_3IN1_PLEASE_REBOOT, false);
 	
-	ime = hwGrab3in1();
-	ReadNorFlash((u8*)&data2, 0x1000, sizeof(data2)); // this should work - but it does not!
-	hwRelease3in1(ime);
-	char txt[128];
-	sprintf(txt, "%.12s", &data2.name[0]);
-	displayMessage(txt);
-
 	while(1) {};
 }
 
@@ -220,10 +289,12 @@ void hwDump3in1(uint32 size, const char *gamename)
 	char path[256];
 	char fname[256] = "";
 	fileSelect("/", path, fname, 0, true, false);
+	
+	// look for an unused filename
 	if (!fname[0]) {
 		uint32 cnt = 0;
 		sprintf(fname, "/%s.%i.sav", gamename, cnt);
-		char txt[256];
+		//char txt[256];
 		sprintf(txt, stringsGetMessageString(STR_HW_SEEK_UNUSED_FNAME), fname);
 		displayMessage2(txt, false);
 		while (fileExists(fname)) {
@@ -238,7 +309,6 @@ void hwDump3in1(uint32 size, const char *gamename)
 	}
 	char fullpath[256];
 	sprintf(fullpath, "%s/%s", path, fname);
-	char txt[512];
 	sprintf(txt, stringsGetMessageString(STR_HW_3IN1_DUMP), fullpath);
 	displayMessage2(txt, false);
 
@@ -259,7 +329,7 @@ void hwDump3in1(uint32 size, const char *gamename)
 
 	sprintf(txt, stringsGetMessageString(STR_HW_3IN1_DONE_DUMP), fullpath);
 	displayMessage2(txt, false);
-	while (1);
+	while (!(keysCurrent() & KEY_B)) {};
 }
 
 void hwRestore3in1()
@@ -270,6 +340,7 @@ void hwRestore3in1()
 	displayMessageA(STR_HW_SELECT_FILE); // lower screen is used for file browser
 	fileSelect("/", path, fname, 0, false, false);
 	char msg[256];
+	// This does not have to be translated.
 	sprintf(msg, "%s/%s", path, fname);
 	displayMessage(msg);
 	
@@ -303,13 +374,11 @@ void hwRestore3in1()
 		ReadNorFlash(test, (i << 15) + pitch, LEN);
 		hwRelease3in1(ime);
 		if (*((vuint16 *)(FlashBase+0x2002)) == 0x227E) {
-			displayMessage("ERROR: ID mode active!");
+			displayMessage2A(STR_HW_3IN1_ERR_IDMODE, false);
 			while(1);
 		}
-		if (int err = memcmp(test, data, LEN)) {
-			char txt[128];
-			sprintf(txt, "ERROR: NOR %x/%x: %x -> %x", abs(err), LEN, data[err], test[err]);
-			displayMessage(txt);
+		if (memcmp(test, data, LEN)) {
+			displayMessage2A(STR_HW_3IN1_ERR_NOR, false);
 			while(1);
 		}
 	}
@@ -317,25 +386,30 @@ void hwRestore3in1()
 	fclose(file);
 	free(test);
 	
-	hwRestore3in1_b(size);
+	hwRestore3in1_b(1 << size);
 }
 
 void hwRestore3in1_b(uint32 size_file)
 {
+	bool ir = (slot_1_type == 1) ? true : false;
+
 	// Third, swap in a new game
-	uint32 size = auxspi_save_size_log_2();
+	uint32 size = auxspi_save_size_log_2(ir);
 	while ((size_file < size) || (slot_1_type == 2)) {
-		// TODO: make THIS error message more meaningful!
-		displayPrintState("File too small or no save chip!");
+		if (slot_1_type == 2)
+			displayMessage2A(STR_HW_SWAP_CARD, false);
+		else if (size_file < size)
+			displayMessage2A(STR_HW_WRONG_GAME, false);
 		swap_cart();
-		size = auxspi_save_size_log_2();
+		ir = (slot_1_type == 1) ? true : false;
+		size = auxspi_save_size_log_2(ir);
 	}
 	displayPrintUpper();
 	
-	uint8 type = auxspi_save_type();
+	uint8 type = auxspi_save_type(ir);
 	if (type == 3) {
 		displayMessage2A(STR_HW_FORMAT_GAME, false);
-		auxspi_erase();
+		auxspi_erase(ir);
 	}
 
 	// And finally, write the save!
@@ -363,7 +437,7 @@ void hwRestore3in1_b(uint32 size_file)
 		uint32 ime = hwGrab3in1();
 		ReadNorFlash(data, (i << shift) + pitch, LEN);
 		hwRelease3in1(ime);
-		auxspi_write_data(i << shift, data, LEN, type);
+		auxspi_write_data(i << shift, data, LEN, type, ir);
 	}
 	displayProgressBar(1, 1);
 
@@ -375,11 +449,10 @@ void hwRestore3in1_b(uint32 size_file)
 // ------------------------------------------------------------
 void hwErase()
 {
+	bool ir = (slot_1_type == 1) ? true : false;
 	displayMessage2A(STR_HW_WARN_DELETE, true);
 	while (!(keysCurrent() & (KEY_UP | KEY_R | KEY_Y))) {};
-	auxspi_erase();
-	displayMessage2A(STR_HW_DID_DELETE, true);
-	while(1);
+	auxspi_erase(ir);
 }
 
 // ------------------------------------------------------------
@@ -388,44 +461,45 @@ void hwBackupFTP(bool dlp)
 	netbuf *buf, *ndata;
 	int j;
 	static int jmax = 10;
+	bool ir = (slot_1_type == 1) ? true : false;
 
 	// Dump save and write it to FTP server
 	// First: swap card
 	if (!dlp)
 		swap_cart();
 	displayPrintUpper();
-	uint8 size = auxspi_save_size_log_2();
+	uint8 size = auxspi_save_size_log_2(ir);
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
-	uint8 type = auxspi_save_type();
+	uint8 type = auxspi_save_type(ir);
 	if (size < 15)
 		size_blocks = 1;
 	else
 		size_blocks = 1 << (uint8(size) - 15);
 
 	// Second: connect to FTP server
-	displayPrintState("FTP: connecting to AP");
+	displayMessage2A(STR_HW_FTP_SEEK_AP, false);
 	if (!Wifi_InitDefault(true)) {
-		displayPrintState("FTP: ERROR: AP not found");
+		displayMessage2A(STR_HW_FTP_ERR_AP, true);
 		while(1);
 	}
-	displayPrintState("FTP: connecting to FTP server");
+	displayMessage2A(STR_HW_FTP_SEEK_FTP, false);
 	char fullname[512];
 	sprintf(fullname, "%s:%i", ftp_ip, ftp_port);
 	j = 0;
 	while (!FtpConnect(fullname, &buf)) {
 		j++;
 		if (j >= jmax) {
-			displayPrintState("FTP: ERROR: FTP server missing");
+			displayMessage2A(STR_HW_FTP_ERR_FTP, true);
 			while(1);
 		}
 		swiDelay(10000);
 	}
-	displayPrintState("FTP: login");
+	displayMessage2A(STR_HW_FTP_LOGIN, false);
 	j = 0;
 	while (!FtpLogin(ftp_user, ftp_pass, buf)) {
 		j++;
 		if (j >= jmax) {
-			displayPrintState("FTP: ERROR: login failed");
+			displayMessage2A(STR_HW_FTP_ERR_LOGIN, true);
 			while(1);
 		}
 		swiDelay(10000);
@@ -435,7 +509,7 @@ void hwBackupFTP(bool dlp)
 	char fname[256] ="";
 	memset(fname, 0, 256);
 	displayMessageA(STR_HW_SELECT_FILE_OW);
-	displayPrintState("FTP: dir");
+	displayPrintState("FTP: dir"); // TODO: translate me!
 	fileSelect("/", fdir, fname, buf, true, false);
 	bool newfile;
 	if (!fname[0])
@@ -452,7 +526,6 @@ void hwBackupFTP(bool dlp)
 		int tsize = 0;
 		sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
 		while (FtpSize(fname, &tsize, FTPLIB_IMAGE, buf) != 0) {
-		char txt[256];
 			sprintf(txt, stringsGetMessageString(STR_HW_SEEK_UNUSED_FNAME), fname);
 			displayMessage2(txt, false);
 			if (cnt < 65536)
@@ -462,13 +535,13 @@ void hwBackupFTP(bool dlp)
 				while(1);
 			}
 			sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
-			displayPrintState(fname);
 		}
 	}
 	
 	// Fourth: dump save
 	displayPrintState("");
-	sprintf(fullname, "Writing file:\n%s%s", fdir, fname);
+	// This may not have to be translated.
+	sprintf(fullname, "%s%s", fdir, fname);
 	displayMessage(fullname);
 	FtpAccess(fname, FTPLIB_FILE_WRITE, FTPLIB_IMAGE, buf, &ndata);
 	u32 length = 0x200;
@@ -476,19 +549,18 @@ void hwBackupFTP(bool dlp)
 		length = 1 << size;
 	for (int i = 0; i < (1 << (size - 9)); i++) {
 		displayProgressBar(i+1, (size_blocks << 6));
-		auxspi_read_data(i << 9, (u8*)&data[0], length, type);
-		int out = 0;
-		while (out < 512) {
-			out += FtpWrite((u8*)&data[out], 512-out, ndata);
-			if (out < 512) {
+		auxspi_read_data(i << 9, (u8*)&data[0], length, type, ir);
+		u32 out = 0;
+		while (out < length) {
+			u32 delta = FtpWrite((u8*)&data[out], length-out, ndata);
+			out += delta;
+			if (delta == 0) {
+				displayMessage2A(STR_HW_FTP_READ_ONLY, false);
+			} else {
+				displayMessage2("", false);
+			}
+			if (delta < length) {
 				displayPrintState(stringsGetMessageString(STR_HW_FTP_SLOW));
-				/*
-				debug++;
-				if (debug >= 2048) {
-					debug = 0;
-					displayMessage2("Unable to reach FTP server. Make sure that you have WRITE ACCESS!"
-				}
-				*/
 			} else {
 				displayPrintState("");
 			}
@@ -500,7 +572,7 @@ void hwBackupFTP(bool dlp)
 	Wifi_DisconnectAP();
 
 	if (dlp) {
-		displayMessage("Done! Please turn off your DS.");
+		displayMessage2A(STR_HW_PLEASE_REBOOT, false);
 		while(1);
 	}
 }
@@ -510,32 +582,33 @@ void hwRestoreFTP(bool dlp)
 	netbuf *buf, *ndata;
 	int j;
 	static int jmax = 10;
+	bool ir = (slot_1_type == 1) ? true : false;
 
 	// Dump save and write it to FTP server
 	// First: connect to FTP server
-	displayPrintState("FTP: connecting to AP");
+	displayMessage2A(STR_HW_FTP_SEEK_AP, false);
 	if (!Wifi_InitDefault(true)) {
-		displayPrintState("FTP: ERROR: AP not found");
+		displayMessage2A(STR_HW_FTP_ERR_AP, true);
 		while(1);
 	}
-	displayPrintState("FTP: connecting to FTP server");
+	displayMessage2A(STR_HW_FTP_SEEK_FTP, false);
 	char fullname[512];
 	sprintf(fullname, "%s:%i", ftp_ip, ftp_port);
 	j = 0;
 	while (!FtpConnect(fullname, &buf)) {
 		j++;
 		if (j >= jmax) {
-			displayPrintState("FTP: ERROR: FTP server missing");
+			displayMessage2A(STR_HW_FTP_ERR_FTP, true);
 			while(1);
 		}
 		swiDelay(10000);
 	}
-	displayPrintState("FTP: login");
+	displayMessage2A(STR_HW_FTP_LOGIN, false);
 	j = 0;
 	while (!FtpLogin(ftp_user, ftp_pass, buf)) {
 		j++;
 		if (j >= jmax) {
-			displayPrintState("FTP: ERROR: login failed");
+			displayMessage2A(STR_HW_FTP_ERR_LOGIN, false);
 			while(1);
 		}
 		swiDelay(10000);
@@ -545,21 +618,21 @@ void hwRestoreFTP(bool dlp)
 	char fdir[256] = "";
 	char fname[256] ="";
 	memset(fname, 0, 256);
-	displayMessage("Please select a file name to\nrestore.");
+	displayMessageA(STR_HW_SELECT_FILE);
 	displayPrintState("FTP: dir");
-	fileSelect("/", fdir, fname, buf, true, false);
+	fileSelect("/", fdir, fname, buf, false, false);
 	
 	// Third: swap card
 	if (!dlp)
 		swap_cart();
 	displayPrintUpper();
-	uint8 size = auxspi_save_size_log_2();
-	uint8 type = auxspi_save_type();
+	uint8 size = auxspi_save_size_log_2(ir);
+	uint8 type = auxspi_save_type(ir);
 
 	// Fourth: read file
 	displayPrintState("");
 	FtpChdir(fdir, buf);
-	sprintf(fullname, "Reading file:\n%s%s", fdir, fname);
+	sprintf(fullname, "%s%s", fdir, fname);
 	displayMessage(fullname);
 	u32 LEN = 0, num_blocks = 0, shift = 0;
 	switch (type) {
@@ -591,8 +664,9 @@ void hwRestoreFTP(bool dlp)
 #endif
 	}
 	if ((type == 3) && (insecure)) {
-		displayPrintState("Formating Flash chip");
-		auxspi_erase();
+		displayMessage2A(STR_HW_FORMAT_GAME, false);
+		//displayPrintState("Formating Flash chip");
+		auxspi_erase(ir);
 	}
 	FtpAccess(fname, FTPLIB_FILE_READ, FTPLIB_IMAGE, buf, &ndata);
 	u8 *pdata = data;
@@ -606,36 +680,26 @@ void hwRestoreFTP(bool dlp)
 			else
 				displayPrintState("");
 		}
-		/*
-		int out;
-	    if ((out = FtpRead((u8*)pdata, 512, ndata)) < 512) {
-			char dings[512];
-			sprintf(dings, "Error: requested 512, got %i", out);
-			displayPrintState(dings);
-			while(1);
-		}
-		*/
-		// does not fit into memory: insecure mode
+		// does not fit into memory: unsafe mode
+		// TODO: reactivate this!
 		if (insecure) {
-			//char bums[512];
-			//sprintf(bums, "addr = %x", (i << 9)+(j << shift));
 			displayPrintState("Writing save (insecure!)");
 			for (int j = 0; j < 1 << (9-shift); j++) {
-				auxspi_write_data((i << 9)+(j << shift), ((u8*)pdata)+(j<<shift), LEN, type);
+				auxspi_write_data((i << 9)+(j << shift), ((u8*)pdata)+(j<<shift), LEN, type, ir);
 			}
 		}
 		pdata += 512;
 	}
+	// Write to game (safe mode)
 	if (!insecure) {
-		displayMessage("Got file, now writing to game");
 		if (type == 3) {
-			displayPrintState("Formating Flash chip");
-			auxspi_erase();
+			displayMessage2A(STR_HW_FORMAT_GAME, false);
+			auxspi_erase(ir);
 		}
 		for (int i = 0; i < (1 << (size - shift)); i++) {
-			displayPrintState("Writing save");
+			displayMessage2A(STR_HW_WRITE_GAME, false);
 			displayProgressBar(i+1, 1 << (size - shift));
-			auxspi_write_data(i << shift, ((u8*)data)+(i<<shift), LEN, type);
+			auxspi_write_data(i << shift, ((u8*)data)+(i<<shift), LEN, type, ir);
 		}
 	}
 	FtpClose(ndata);
@@ -644,7 +708,7 @@ void hwRestoreFTP(bool dlp)
 	Wifi_DisconnectAP();
 
 	if (dlp) {
-		displayMessage("Done! Please turn off your DS.");
+		displayMessage2A(STR_HW_PLEASE_REBOOT, false);
 		while(1);
 	}
 }
@@ -656,22 +720,26 @@ void hwBackupGBA(u8 type)
 		return;
 	
 	if ((type == 1) || (type == 2)) {
+		// This is not to be translated, it will be removed at some point.
 		displayMessage("I can't read this save type\nyet. Please use Rudolphs tool\ninstead.");
 		return;
 	}
-
+	
 	char path[256];
 	char fname[256] = "";
 	char *gamename = (char*)0x080000a0;
 	fileSelect("/", path, fname, 0, true, false);
+	// look for an unused filename
 	if (!fname[0]) {
 		uint32 cnt = 0;
 		sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
+		sprintf(txt, stringsGetMessageString(STR_HW_SEEK_UNUSED_FNAME), fname);
+		displayMessage2(txt, false);
 		while (fileExists(fname)) {
 			if (cnt < 65536)
 				cnt++;
 			else {
-				displayMessage("Unable to get a filename!\nThis means that you have more\nthan 65536 saves! (wow!)\nOops!");
+				displayMessage2A(STR_ERR_NO_FNAME, true);
 				while(1);
 			}
 			sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
@@ -681,11 +749,11 @@ void hwBackupGBA(u8 type)
 	sprintf(fullpath, "%s/%s", path, fname);
 	displayMessage(fname);
 	
-	displayPrintState("Reading save from game");
+	displayMessage2A(STR_HW_GBA_READ, false);
 	uint32 size = gbaGetSaveSize(type);
 	gbaReadSave(data, 0, size, type);
 	
-	displayPrintState("Writing save to flash card");
+	displayMessage2A(STR_HW_GBA_DUMP, false);
 	FILE *file = fopen(fullpath, "wb");
 	fwrite(data, 1, size, file);
 	fclose(file);
@@ -701,6 +769,7 @@ void hwRestoreGBA()
 		return;
 	
 	if ((type == 1) || (type == 2)) {
+		// This is not to be translated, it will be removed at some point.
 		displayMessage("I can't write this save type\nyet. Please use Rudolphs tool\ninstead.");
 		return;
 	}
@@ -712,22 +781,23 @@ void hwRestoreGBA()
 	fileSelect("/", path, fname, 0);
 	char fullpath[512];
 	sprintf(fullpath, "%s/%s", path, fname);
-	displayMessage(fname);
+	//displayMessage(fname);
 
-	displayPrintState("Reading save from flash card");
+	sprintf(txt, stringsGetMessageString(STR_HW_GBA_LOAD), fname);
+	displayMessage2A(STR_HW_GBA_LOAD, false);
 	FILE *file = fopen(fullpath, "rb");
 	fread(data, 1, size, file);
 	fclose(file);
 	
 	if ((type == 4) || (type == 5)) {
-		displayPrintState("Deleting old save.");
+		displayMessage2A(STR_HW_FORMAT_GAME, false);
 		gbaFormatSave(type);
 	}
 	
-	displayPrintState("Writing save to game");
+	displayMessage2A(STR_HW_WRITE_GAME, false);
 	gbaWriteSave(data, 0, size, type);
 
-	displayPrintState("Done!");
+	displayMessage2A(STR_HW_PLEASE_REBOOT, false);
 	while(1);
 }
 

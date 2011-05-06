@@ -40,4 +40,15 @@ extern int ftp_port;
 
 extern int ir_delay;
 
+// all libfat access will be using this device. default value = "/", i.e. "default" DLDI device
+extern char device[16];
+
+// text buffer for composing various messages
+extern char txt[256];
+
+extern u32 mode;
+extern u32 ezflash;
+
+extern int slot2;
+
 #endif // GLOBALS_H
