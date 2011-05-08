@@ -57,7 +57,6 @@ static u32 pitch = 0x40000;
 
 
 // ---------------------------------------------------------------------
-// FIXME: after the slot 1 detection was factored out, swap_cart no longer has perfect accuracy!
 bool swap_cart()
 {
 	sNDSHeader nds;
@@ -74,12 +73,15 @@ bool swap_cart()
 				// don't try to dump a flash card
 				if (slot_1_type == 2)
 					continue;
+
 				sysSetBusOwners(true, true);
 				// this will break DLDI on the Cyclops Evolution, but we need it anyway.
 				cardReadHeader((u8*)&nds);
 				displayPrintUpper();
-				if (!nds.gameTitle[0])
+				if (!nds.gameTitle[0]) {
+					displayMessage2A(STR_HW_CARD_UNREADABLE, false);
 					continue;
+				}
 				
 				return true;
 			}
@@ -104,7 +106,19 @@ u32 get_slot1_type()
 	if (size1 > 0)
 		return 0;
 	
-	// No save size test returned a save chip, so it must be a flash card.
+	// No save size test returned a save chip, so it must be a flash card,
+	//  or a type 3 save with an unknown JEDEC ID. Unfortunately, due to
+	//  different behaviour of flash cards, we can't test for this case,
+	//  or the flash card may be recognised as "type 3 game".
+	/*
+	u32 id2 = auxspi_save_jedec_id(true);
+	u32 id1 = auxspi_save_jedec_id(false);
+	if (id2 != 0x00ffffff)
+		return 1;
+	if (id1 != 0x00ffffff)
+		return 0;
+		*/
+	
 	return 2;
 }
 

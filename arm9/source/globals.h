@@ -51,4 +51,10 @@ extern u32 ezflash;
 
 extern int slot2;
 
+// this should be enough for the forseeable future
+#define EXTRA_ARRAY_SIZE 16
+
+extern u32 extra_id[EXTRA_ARRAY_SIZE];
+extern u8 extra_size[EXTRA_ARRAY_SIZE];
+
 #endif // GLOBALS_H

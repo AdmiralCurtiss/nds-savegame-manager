@@ -178,10 +178,6 @@ void fileSelect(const char *startdir, char *out_dir, char *out_fname, netbuf *bu
 		ftpGetFileList("/", buf, num_files);
 	else
 		fileGetFileList(startdir, num_files);
-	if (num_files == 0) {
-		displayMessage("ERROR");
-		while(1);
-	}
 	filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
 		
 	while (!select) {

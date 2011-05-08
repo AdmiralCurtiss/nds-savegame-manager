@@ -45,3 +45,6 @@ u32 mode = 0;
 u32 ezflash = 0;
 
 int slot2 = 0;
+
+u32 extra_id[EXTRA_ARRAY_SIZE];
+u8 extra_size[EXTRA_ARRAY_SIZE];

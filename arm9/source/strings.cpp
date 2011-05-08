@@ -78,6 +78,7 @@ bool stringsLoadFile(const char *fname)
 	ADD_STRING(STR_BOOT_DLDI_ERROR,"DLDI initialisation error!");
 	//
 	ADD_STRING(STR_HW_SWAP_CARD,"Please take out Slot 1\nflash card and insert a game\n\nPress A when done.");
+	ADD_STRING(STR_HW_CARD_UNREADABLE,"I can't read the game\ninserted in slot 1.\nPlease eject and retry.");
 	ADD_STRING(STR_HW_WRONG_GAME,"This game has a save chip\nthat is smaller than the\nsave you are going to\nwrite. Please insert a\ndifferent game.\n\nPress A when done.");
 	ADD_STRING(STR_HW_PLEASE_REBOOT,"Done! Please power off\n(and restart if you want\nto do more).");
 	//

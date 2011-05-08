@@ -328,6 +328,21 @@ bool loadIniFile(char* path)
 	
 	ini_close(ini);
 	
+	// load additional Flash chip signatures (JEDEC IDs)
+	ini_locateHeading(ini, "new chips");
+	for (int i = 0; i < EXTRA_ARRAY_SIZE; i++) {
+		int tmp;
+		sprintf(txt, "%i-id", i);
+		ini_locateKey(ini, txt);
+		ini_readInt(ini, &tmp);
+		extra_id[i] = (u32)tmp;
+		//
+		sprintf(txt, "%i-size", i);
+		ini_locateKey(ini, txt);
+		ini_readInt(ini, &tmp);
+		extra_size[i] = tmp;
+	}
+	
 	// delete temp file (which is a remnant of inilib)
 	remove("/tmpfile");
 	
@@ -357,12 +372,12 @@ bool has_argv(int argc, char* argv[])
 	char *arg0 = argv[0];
 	// test for possible "/path", "fat*:/path" and "sd:/*".
 	if (*arg0 == 'f')
-		if (strncasecmp(argv[0], "fat:/", 5) || strncasecmp(argv[0], "fat1:/", 6)
-			|| strncasecmp(argv[0], "fat2:/", 6))
+		if (!strncasecmp(argv[0], "fat:/", 5) || !strncasecmp(argv[0], "fat1:/", 6)
+			|| !strncasecmp(argv[0], "fat2:/", 6))
 			return true;
 
 	if (*arg0 == 's')
-		if (strncasecmp(argv[0], "sd:/", 4))
+		if (!strncasecmp(argv[0], "sd:/", 4))
 			return true;
 	
 	if (*arg0 == '/')
@@ -381,34 +396,37 @@ int main(int argc, char* argv[])
 	// detect hardware
 	mode = hwDetect();
 	
-	// Init DLDI (file system driver), skip for mode == 4,5 which already calls this during
-	//  hardware initialisation
-	if (mode < 4) {
-		int fat = fatInitDefault();
-		if (fat == 0) {
-			displayMessage2A(STR_BOOT_DLDI_ERROR,true);
-			while (1);
-		}
+	// Init DLDI (file system driver)
+	int fat = fatInitDefault();
+	if (fat == 0) {
+		displayMessage2A(STR_BOOT_DLDI_ERROR,true);
+		while (1);
 	}
 	
 	// Load the ini file with the FTP settings and more options
+	for (int i = 0; i < EXTRA_ARRAY_SIZE; i++) {
+		extra_id[i] = 0xff000000;
+		extra_size[i] = 0;
+	}
 	if (has_argv(argc, argv))
 		loadIniFile(argv[0]);
 	else
 		loadIniFile(0);
 
+	// load strings
+	stringsLoadFile(0);
+
 	// prepare the global data buffer
 	data = (u8*)malloc(size_buf);
-	// This should not be required, but better safe than sorry. On the DS, it *might* be
+	// On my Cyclops, no 2MB buffer is available after loading strings! bad memory management?
+	//  Anyway, we can't do anything except for the following (which restricts the usefulness
+	//  of FTP safe mode)
 	//  possible that no continuous 2 MB are available.
-	if (data == NULL) {
+	while (data == NULL) {
 		size_buf >>= 1;
 		data = (u8*)malloc(size_buf);
 	}
 	
-	// load strings
-	stringsLoadFile(0);
-		
 	// okay, we got our HW identified; now branch to the corresponding main function/event handler
 	switch (mode) {
 		case 1:

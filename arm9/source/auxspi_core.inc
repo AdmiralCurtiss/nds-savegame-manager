@@ -36,7 +36,7 @@ inline void auxspi_wait_busy()
 
 inline void auxspi_open(uint8 device)
 {
-	REG_AUXSPICNT = 0xa040 | (device & 3);
+	REG_AUXSPICNT = 0xa040 | (device & 3) | 3;
 	auxspi_wait_busy();
 }
 

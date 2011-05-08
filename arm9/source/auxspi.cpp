@@ -51,15 +51,24 @@ uint8 jedec_table(uint32 id)
 	// 1 MB
 	case 0x204014:
 		return 0x14;
+	// 2 MB (not sure if this exists, but I vaguely remember something...)
+	case 0x204015:
+		return 0x15;
 	// 8 MB (Band Brothers DX)
+	case 0x202017: // which one? (more work is required to unlock this save chip!)
 	case 0x204017:
 		return 0x17;
-	default:
-		return 0;
+	default: {
+		for (int i = 0; i < EXTRA_ARRAY_SIZE; i++) {
+			if (extra_id[i] == id)
+				return extra_size[i];
+		}
+		return 0; // unknown save type!
+	}
 	};
 }
 
-uint8 type2_size()
+uint8 type2_size(bool ir = false)
 {
 	static const uint32 offset0 = (8*1024-1);        //      8KB
 	static const uint32 offset1 = (2*8*1024-1);      //      16KB
@@ -67,12 +76,12 @@ uint8 type2_size()
 	u8 buf2;     //      +8k data        read -> read
 	u8 buf3;     //      +0k ~data          write
 	u8 buf4;     //      +8k data new    comp buf2
-	auxspi_read_data(offset0, &buf1, 1, 2);
-	auxspi_read_data(offset1, &buf2, 1, 2);
+	auxspi_read_data(offset0, &buf1, 1, 2, ir);
+	auxspi_read_data(offset1, &buf2, 1, 2, ir);
 	buf3=~buf1;
-	auxspi_write_data(offset0, &buf3, 1, 2);
-	auxspi_read_data (offset1, &buf4, 1, 2);
-	auxspi_write_data(offset0, &buf1, 1, 2);
+	auxspi_write_data(offset0, &buf3, 1, 2, ir);
+	auxspi_read_data (offset1, &buf4, 1, 2, ir);
+	auxspi_write_data(offset0, &buf1, 1, 2, ir);
 	if(buf4!=buf2)      //      +8k
 		return 0x0d;  //       8KB(64kbit)
 	else
@@ -89,6 +98,7 @@ uint8 auxspi_save_type(bool ir)
 	if ((sr & 0xfd) == 0xF0 && (jedec == 0x00ffffff)) return 1;
 	if ((sr & 0xfd) == 0x00 && (jedec == 0x00ffffff)) return 2;
 	if ((sr & 0xfd) == 0x00 && (jedec != 0x00ffffff)) return 3; // should also cover Pokemon HG/SS
+	// TODO: add support for Band Brothers DX (as soon as I know how)
 	
 	return 0;
 }
@@ -100,13 +110,13 @@ uint32 auxspi_save_size(bool ir)
 
 uint8 auxspi_save_size_log_2(bool ir)
 {
-	uint8 type = auxspi_save_type();
+	uint8 type = auxspi_save_type(ir); // TESTME: "ir" was missing, should fix recent issues
 	switch (type) {
 	case 1:
 		return 0x09; // 512 bytes
 		break;
 	case 2:
-		return type2_size();
+		return type2_size(ir);
 		break;
 	case 3:
 		return jedec_table(auxspi_save_jedec_id(ir));
@@ -127,6 +137,7 @@ uint32 auxspi_save_jedec_id(bool ir)
 	id |= auxspi_read() << 8;
 	id |= auxspi_read();
 	auxspi_close();
+	
 	return id;
 }
 
@@ -174,12 +185,10 @@ void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type, bool ir)
 
 void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type, bool ir)
 {
-/*
 	if (type == 0)
 		type = auxspi_save_type();
 	if (type == 0)
 		return;
-		*/
 
 	uint32 addr_end = addr + cnt;
 	int i;
@@ -223,8 +232,6 @@ void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type, bool ir)
         }
 		auxspi_close_lite();
 
-		// wait for programming to finish
-		//auxspi_wait_wip();
 		// wait programming to finish
 		if (ir)
 			auxspi_disable_infrared();
@@ -270,7 +277,6 @@ void auxspi_erase(bool ir)
 			auxspi_close_lite();
 			
 			// wait for programming to finish
-			//auxspi_wait_wip();
 			if (ir)
 				auxspi_disable_infrared();
 			auxspi_open(0);
