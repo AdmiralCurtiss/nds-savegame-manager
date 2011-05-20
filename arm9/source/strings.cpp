@@ -37,89 +37,94 @@ using namespace std;
 
 // a global string array
 char **message_strings;
-//char txt[512];
 
-#define ADD_STRING(id,text)	strcpy(txt,text);\
+#define ADD_STRING(id,text) sprintf(txt, "%i", id);\
+	if (ini_locateKey(ini, txt) == 0) {\
+		ini_readString(ini, txt, 256);\
+	} else {\
+		strcpy(txt,text);\
+	}\
 	message_strings[id] = new char[strlen(txt)+1];\
 	memcpy(message_strings[id], txt, strlen(txt)+1);
 
 
 bool stringsLoadFile(const char *fname)
 {
-#define NOT_FINISHED
-
-#ifndef NOT_FINISHED
 	// load ini file...
 	ini_fd_t ini = 0;
 	if (fileExists(fname))
 		ini = ini_open(fname, "r", "");
-	else
-		return false;
-#endif
 
 	message_strings = new char*[STR_LAST];
-#ifndef NOT_FINISHED
 	ini_locateHeading(ini, "");
-	//char txt[512];
-	for (int i = 0; i < STR_LAST; i++) {
-		sprintf(txt, "%i", i);
-		ini_locateKey(ini, txt);
-		ini_readString(ini, txt, 512);
-		message_strings[i] = new char[strlen(txt)+1];
-		memcpy(message_strings[i], txt, strlen(txt)+1);
-	}
 
-	// delete temp file (which is a remnant of inilib)
-	remove("/tmpfile");
-#else
+	ADD_STRING(STR_EMPTY, "");
+	ADD_STRING(STR_STR, "%s");
+	//
+	ADD_STRING(STR_MM_WIPE,"\n    WIPES OUT ALL SAVE DATA\n         ON YOUR GAME !");
+	ADD_STRING(STR_TITLE_MSG,"DS savegame manager\nVersion 0.2.5 semi-stable\nBy Pokedoc");
 	ADD_STRING(STR_BOOT_NO_INI,"Unable to open ini file!\nPlease make sure that it is\n1. in this apps folder, or"
 		  "\n2. in the root folder\nIf 1. does not work, use 2.");
 	ADD_STRING(STR_BOOT_MODE_UNSUPPORTED,"This mode is DISABLED.\nPlease restart the system.");
 	ADD_STRING(STR_BOOT_DLDI_ERROR,"DLDI initialisation error!");
 	//
-	ADD_STRING(STR_HW_SWAP_CARD,"Please take out Slot 1\nflash card and insert a game\n\nPress A when done.");
-	ADD_STRING(STR_HW_CARD_UNREADABLE,"I can't read the game\ninserted in slot 1.\nPlease eject and retry.");
-	ADD_STRING(STR_HW_WRONG_GAME,"This game has a save chip\nthat is smaller than the\nsave you are going to\nwrite. Please insert a\ndifferent game.\n\nPress A when done.");
-	ADD_STRING(STR_HW_PLEASE_REBOOT,"Done! Please power off\n(and restart if you want\nto do more).");
+	ADD_STRING(STR_HW_SWAP_CARD,"Please take out Slot 1 flash card and insert a game.\nPress A when done.");
+	ADD_STRING(STR_HW_CARD_UNREADABLE,"I can't read the game inserted in slot 1.\nPlease eject and retry.");
+	ADD_STRING(STR_HW_WRONG_GAME,"This game has a save chip that is bigger than the save you are going to write. Please insert a different game.\nPress A when done.");
+	ADD_STRING(STR_HW_PLEASE_REBOOT,"Done! Please power off\n(and restart if you want to do more).");
 	//
 	ADD_STRING(STR_HW_SELECT_FILE,"Please select a .sav file.");
-	ADD_STRING(STR_HW_SELECT_FILE_OW,"Please select a file to\noverwrite, or press L+R in afolder to create a new file.");
-	ADD_STRING(STR_HW_SEEK_UNUSED_FNAME,"Please wait... searching for\nan unused filename.\n\nTrying: %s");
-	ADD_STRING(STR_ERR_NO_FNAME,"ERROR: Unable to get an\nunused nfilename! This means that you have more than\n65536 saves!\n\n(wow!)");
+	ADD_STRING(STR_HW_SELECT_FILE_OW,"Please select a file to overwrite, or press L+R in a folder to create a new file.");
+	ADD_STRING(STR_HW_SEEK_UNUSED_FNAME,"Please wait... searching for an unused filename.\nTrying: %s");
+	ADD_STRING(STR_ERR_NO_FNAME,"ERROR: Unable to get an unused nfilename! This means that you have more than 65536 saves!\n(wow!)");
 	//
-	ADD_STRING(STR_HW_FORMAT_GAME,"Preparing to write to your\ngame. Please wait...");
-	ADD_STRING(STR_HW_WRITE_GAME,"Writing the save to your\ngame. Please wait...");
+	ADD_STRING(STR_HW_FORMAT_GAME,"Preparing to write to your game.\nPlease wait...");
+	ADD_STRING(STR_HW_WRITE_GAME,"Writing save to your game.\nPlease wait...");
+	ADD_STRING(STR_HW_READ_GAME,"Reading save from your game.\nPlease wait...");
+	ADD_STRING(STR_HW_WRITE_FILE, "Writing file:\n%s");
+	ADD_STRING(STR_HW_READ_FILE, "Reading file:\n%s");
 	//
-	ADD_STRING(STR_HW_3IN1_FORMAT_NOR,"Preparing to write to the\n3in1. Please wait...");
-	ADD_STRING(STR_HW_3IN1_WRITE_NOR,"Writing save data to the\n3in1. Please wait...");
+	ADD_STRING(STR_HW_3IN1_FORMAT_NOR,"Preparing to write to the 3in1.\nPlease wait...");
 	ADD_STRING(STR_HW_3IN1_PREPARE_REBOOT,"Preparing reboot...");
-	ADD_STRING(STR_HW_3IN1_PLEASE_REBOOT,"Save has been written to\nthe 3in1. Please power off\nand restart this tool.");
-	ADD_STRING(STR_HW_3IN1_CLEAR_FLAG,"Preparing to dump your\nsave... Please wait...");
-	ADD_STRING(STR_HW_3IN1_DUMP,"Dumping the save from the\n3in1 to your flash card.\nFilename:\n%s");
-	ADD_STRING(STR_HW_3IN1_DONE_DUMP,"Done. Your game save has\nbeen dumped using your\n3in1. Filename:\n%s\n\nPress (B) to continue.");
-	ADD_STRING(STR_HW_3IN1_RESTORE,"Done. Your game save has\nbeen restored using your\n3in1.\n\nPlease restart your DS.");
+	ADD_STRING(STR_HW_3IN1_PLEASE_REBOOT,"Save has been written to the 3in1. Please power off and restart this tool to finish the dump.");
+	ADD_STRING(STR_HW_3IN1_CLEAR_FLAG,"Preparing to dump your save...\nPlease wait...");
+	ADD_STRING(STR_HW_3IN1_DONE_DUMP,"Done. Your game save has been dumped using your 3in1. Filename:\n%s\nPress (B) to continue.");
 	ADD_STRING(STR_HW_3IN1_ERR_IDMODE,"ERROR!\nID mode still active!");
-	ADD_STRING(STR_HW_3IN1_ERR_NOR,"ERROR!\nNOR memory seems to be\ndamaged!");
+	ADD_STRING(STR_HW_3IN1_ERR_NOR,"ERROR!\nWriting to NOR failed!");
 	//
-	ADD_STRING(STR_HW_FTP_SEEK_AP,"Connecting to an access\npoint...\n\nplease wait...");
-	ADD_STRING(STR_HW_FTP_ERR_AP,"ERROR!\nCould not find a compatible\nAccess Point. Please config\nyour WiFi Connection from\na WiFi-enabled game!");
-	ADD_STRING(STR_HW_FTP_SEEK_FTP,"Connecting to an FTP\nserver...\n\nplease wait...");
-	ADD_STRING(STR_HW_FTP_ERR_FTP,"ERROR!\nCould not find an FTP\nserver. Please refer to\nthe documentation.");
+	ADD_STRING(STR_HW_FTP_SEEK_AP,"Connecting to an access point...\nplease wait...");
+	ADD_STRING(STR_HW_FTP_ERR_AP,"ERROR!\nCould not find a compatible Access Point. Please configure your WiFi Connection from a WiFi-enabled game!");
+	ADD_STRING(STR_HW_FTP_SEEK_FTP,"Connecting to an FTP server...\nplease wait...");
+	ADD_STRING(STR_HW_FTP_ERR_FTP,"ERROR!\nCould not find an FTP server. Please refer to the documentation.");
 	ADD_STRING(STR_HW_FTP_LOGIN,"Logging in...");
-	ADD_STRING(STR_HW_FTP_ERR_LOGIN,"ERROR!\nCould not log in to the\nFTP server. Please verify\nyour username and password\nare correct in your\nini file.");
+	ADD_STRING(STR_HW_FTP_ERR_LOGIN,"ERROR!\nCould not log in to the FTP server. Please verify your username and password are correct in your ini file.");
 	ADD_STRING(STR_HW_FTP_DIR,"Reading FTP directory...");
 	ADD_STRING(STR_HW_FTP_SLOW,"FTP is slow, please wait...");
-	ADD_STRING(STR_HW_FTP_READ_ONLY,"WARNING: could not write to\nyour FTP server! Maybe you\nforgot to enable write\naccess?");
+	ADD_STRING(STR_HW_FTP_READ_ONLY,"WARNING:\nCould not write to your FTP server! Maybe you forgot to enable write access?");
 	//
-	ADD_STRING(STR_HW_GBA_READ,"Reading save from your game.Please wait...");
-	ADD_STRING(STR_HW_GBA_DUMP,"Writing save to flash card.\nPlease wait...");
-	ADD_STRING(STR_HW_GBA_LOAD,"Reading save from your\nflash card. Filename:\n%s\n\nPlease wait...");
-	ADD_STRING(STR_HW_GBA_RESTORE,"Restoring save to your game\n\nPlease wait...");
+	ADD_STRING(STR_HW_WARN_DELETE,"This will WIPE OUT your entire save! ARE YOU SURE?\n\nPress R+up+Y to confim!");
+	ADD_STRING(STR_HW_DID_DELETE,"Done. Your game save has been PERMANENTLY deleted.\n\nPlease restart your DS.");
 	//
-	ADD_STRING(STR_HW_WARN_DELETE,"This will WIPE OUT your\nentire save! ARE YOU SURE?\n\nPress R+up+Y to confim!");
-	ADD_STRING(STR_HW_DID_DELETE,"Done. Your game save has\nbeen PERMANENTLY deleted.\n\nPlease restart your DS.");
+	ADD_STRING(STR_FS_READ,"Please select a .sav file\n    (A) Select\n    (B) One directory up\n");
+	ADD_STRING(STR_FS_WRITE,"Please select a .sav file\n    (A) Select\n    (B) One directory up\n    (L+R) cancel (new file)");
 	//
-#endif
+
+	// delete temp file (which is a remnant of inilib)
+	remove("/tmpfile");
+	
+	// Convert manual newline commands added as plaintext in the translation file.
+	// FIXME: this does not seem to work reliably yet (or maybe it is the print function).
+	for (int i = 0; i < STR_LAST; i++) {
+		char *ptr = message_strings[i];
+		while ((ptr = strchr(ptr, '\\')) != NULL) {
+			if (strlen(ptr+1)) {
+				if (ptr[1] == 'n') {
+					ptr[0] = '\n';
+					memmove(ptr+1, ptr+2, strlen(ptr)-1);
+				}
+			}
+		}
+	}
 	
 	return true;
 }

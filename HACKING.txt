@@ -1,0 +1,30 @@
+This file gives an overiew how the code is organised; if you want to start hacking, I hope this helps you to find the target file faster.
+
+Custom ARM7 binary:
+
+The program uses a (non-)custom ARM7 binary. Right now, this is a straight copy of default_arm7 from devkitpro; it exists anyway because it allows to implement/test various hardware-specific stuff that only ARM7 can access.
+
+Main program (ARM9):
+- main.cpp. The main program, including the main(argc, argv) function, event handlers for the various modes, plus some subfunctions for handling argv on cards that do not support them.
+- auxspi.h, auxspi.cpp, auxspi_core.inc: This is the actual magic - a reimplementation of the eeprom functions from libnds, using inline functions (found in auxspi_core.cpp).
+- dsCard.h, dsCard.cpp: This is a small hack of the code sample made available by Team EZFlash to address the EZFlash 3in1. Some fixes to make it work on older cards.
+- gba.h, gba.cpp: This implements the eeprom functions for GBA games, however tailored to work on a DS phat/lite.
+- hardware.h, hardware.cpp: This is a happy collection of functions working with hardware. No low-level functions (they are found in different files), but instead working methods to access the save and write it back. Basically, this is what the event handlers in main.cpp do call. Hardware detection has also been moved here.
+- fileselect.h, fileselect.cpp: This is a file select function written from scratch, that works both with libfat filesystems and a remote FTP server. It is somewhat tailored to the program (but could probably be recycled for other projects).
+- dsi.h, dsi.cpp: A collection of functions exclusive to the DSi. Right now, it does not do anything noteworthy.
+- display.h, display.cpp: A collection of functions that are used to write most text used by the program, in a somewhat intependent version. This is where to start if you want to change the GUI.
+- strings.h, strings.cpp: The new translation interface. If you use these functions, you are able to swap out strings by providing an external ini file.
+- globals.h, globals.cpp: All global variables are defined and implemented here.
+
+FTPlib (by Thomas Pfau):
+A handy and compact library for accessing an FTP server. Written in pure C, with no additional external dependencies. Mostly untouched, just some quick hacks so it builds. One milion warnings during the build process, which you can safely ignore.
+- ftplib.h
+- ftplib.c
+
+libini (by Simon White)
+A small library for parsing ini files. Mostly untouched.
+- libini.h
+- ini*.h
+- *.i
+- ini.cpp
+

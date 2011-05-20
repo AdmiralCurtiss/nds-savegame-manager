@@ -63,7 +63,7 @@ bool swap_cart()
 	nds.gameTitle[0] = 0;
 	
 	while (!nds.gameTitle[0]) {
-		displayMessage2A(STR_HW_SWAP_CARD, false);
+		displayMessage2F(STR_HW_SWAP_CARD);
 
 		bool swap = false;
 		while (!swap) {
@@ -79,7 +79,7 @@ bool swap_cart()
 				cardReadHeader((u8*)&nds);
 				displayPrintUpper();
 				if (!nds.gameTitle[0]) {
-					displayMessage2A(STR_HW_CARD_UNREADABLE, false);
+					displayMessage2F(STR_HW_CARD_UNREADABLE);
 					continue;
 				}
 				
@@ -232,10 +232,10 @@ void hwBackup3in1()
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
 	uint8 type = auxspi_save_type(ir);
 
-	displayMessage2A(STR_HW_3IN1_FORMAT_NOR, false);
+	displayMessage2F(STR_HW_3IN1_FORMAT_NOR);
 	hwFormatNor(0, size_blocks+1);
 
-	displayMessage2A(STR_HW_3IN1_WRITE_NOR, false);
+	displayMessage2F(STR_HW_READ_GAME);
 	if (size < 15)
 		size_blocks = 1;
 	else
@@ -257,11 +257,11 @@ void hwBackup3in1()
 		ReadNorFlash(test, (i << 15) + pitch, LEN);
 		hwRelease3in1(ime);
 		if (*((vuint16 *)(FlashBase+0x2002)) == 0x227E) {
-			displayMessage2A(STR_HW_3IN1_ERR_IDMODE, false);
+			displayMessage2F(STR_HW_3IN1_ERR_IDMODE);
 			while(1);
 		}
 		if (memcmp(test, data, LEN)) {
-			displayMessage2A(STR_HW_3IN1_ERR_NOR, false);
+			displayMessage2F(STR_HW_3IN1_ERR_NOR);
 			while(1);
 		}
 	}
@@ -270,7 +270,7 @@ void hwBackup3in1()
 	// Write a flag to tell the app what happens on restart.
 	// This is necessary, since some DLDI drivers cease working after swapping a card.
 	// Fix for dead batteries: don't write "reboot" values to SRAM, but to NOR.
-	displayMessage2A(STR_HW_3IN1_PREPARE_REBOOT, false);
+	displayMessage2F(STR_HW_3IN1_PREPARE_REBOOT);
 	//
 	sNDSHeader nds;
 	cardReadHeader((u8*)&nds); // on a Cyclops Evolution, this call *will* mess up your DLDI driver!
@@ -286,10 +286,10 @@ void hwBackup3in1()
 	memset(data, 0, 0x8000);
 	memcpy(&data[0x1000], (u8*)&data2, sizeof(data2));
 	uint32 ime = hwGrab3in1();
-	WriteNorFlash(0, data, 0x8000); // this should work - but it does not!
+	WriteNorFlash(0, data, 0x8000);
 	hwRelease3in1(ime);
 	
-	displayMessage2A(STR_HW_3IN1_PLEASE_REBOOT, false);
+	displayMessage2F(STR_HW_3IN1_PLEASE_REBOOT);
 	
 	while(1) {};
 }
@@ -298,7 +298,7 @@ void hwDump3in1(uint32 size, const char *gamename)
 {
 	u32 size_blocks = 1 << max(0, (uint8(size) - 18));
 
-	displayMessageA(STR_HW_SELECT_FILE_OW);
+	displayMessageF(STR_HW_SELECT_FILE_OW);
 	
 	char path[256];
 	char fname[256] = "";
@@ -308,14 +308,12 @@ void hwDump3in1(uint32 size, const char *gamename)
 	if (!fname[0]) {
 		uint32 cnt = 0;
 		sprintf(fname, "/%s.%i.sav", gamename, cnt);
-		//char txt[256];
-		sprintf(txt, stringsGetMessageString(STR_HW_SEEK_UNUSED_FNAME), fname);
-		displayMessage2(txt, false);
+		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
 		while (fileExists(fname)) {
 			if (cnt < 65536)
 				cnt++;
 			else {
-				displayMessage2A(STR_ERR_NO_FNAME, true);
+				displayWarning2F(STR_ERR_NO_FNAME);
 				while(1);
 			}
 			sprintf(fname, "%s.%i.sav", gamename, cnt);
@@ -323,9 +321,8 @@ void hwDump3in1(uint32 size, const char *gamename)
 	}
 	char fullpath[256];
 	sprintf(fullpath, "%s/%s", path, fname);
-	sprintf(txt, stringsGetMessageString(STR_HW_3IN1_DUMP), fullpath);
-	displayMessage2(txt, false);
-
+	displayMessage2F(STR_HW_WRITE_FILE, fullpath);
+	
 	FILE *file = fopen(fullpath, "wb");
 	if (size < 15)
 		size_blocks = 1;
@@ -341,8 +338,7 @@ void hwDump3in1(uint32 size, const char *gamename)
 	}
 	fclose(file);
 
-	sprintf(txt, stringsGetMessageString(STR_HW_3IN1_DONE_DUMP), fullpath);
-	displayMessage2(txt, false);
+	displayMessage2F(STR_HW_3IN1_DONE_DUMP, fullpath);
 	while (!(keysCurrent() & KEY_B)) {};
 }
 
@@ -351,12 +347,12 @@ void hwRestore3in1()
 	char path[256];
 	char fname[256];
 	memset(fname, 0, 256);
-	displayMessageA(STR_HW_SELECT_FILE); // lower screen is used for file browser
+	displayMessageF(STR_HW_SELECT_FILE); // lower screen is used for file browser
 	fileSelect("/", path, fname, 0, false, false);
 	char msg[256];
 	// This does not have to be translated.
+	// FIXME: make this more meaningful!
 	sprintf(msg, "%s/%s", path, fname);
-	displayMessage(msg);
 	
 	FILE *file = fopen(msg, "rb");
 	uint32 size0 = fileSize(msg);
@@ -368,10 +364,10 @@ void hwRestore3in1()
 	}
 	int size_blocks = 1 << max(0, int8(size) - 18); // ... in units of 0x40000 bytes - that's 256 kB
 	
-	displayMessage2A(STR_HW_3IN1_FORMAT_NOR, false);
+	displayMessage2F(STR_HW_3IN1_FORMAT_NOR);
 	hwFormatNor(1, size_blocks);
 
-	displayMessage2A(STR_HW_3IN1_WRITE_NOR, false);
+	displayMessage2F(STR_HW_READ_FILE, msg);
 	if (size < 15)
 		size_blocks = 1;
 	else
@@ -388,11 +384,11 @@ void hwRestore3in1()
 		ReadNorFlash(test, (i << 15) + pitch, LEN);
 		hwRelease3in1(ime);
 		if (*((vuint16 *)(FlashBase+0x2002)) == 0x227E) {
-			displayMessage2A(STR_HW_3IN1_ERR_IDMODE, false);
+			displayMessage2F(STR_HW_3IN1_ERR_IDMODE);
 			while(1);
 		}
 		if (memcmp(test, data, LEN)) {
-			displayMessage2A(STR_HW_3IN1_ERR_NOR, false);
+			displayMessage2F(STR_HW_3IN1_ERR_NOR);
 			while(1);
 		}
 	}
@@ -411,9 +407,9 @@ void hwRestore3in1_b(uint32 size_file)
 	uint32 size = auxspi_save_size_log_2(ir);
 	while ((size_file < size) || (slot_1_type == 2)) {
 		if (slot_1_type == 2)
-			displayMessage2A(STR_HW_SWAP_CARD, false);
+			displayMessage2F(STR_HW_SWAP_CARD);
 		else if (size_file < size)
-			displayMessage2A(STR_HW_WRONG_GAME, false);
+			displayMessage2F(STR_HW_WRONG_GAME);
 		swap_cart();
 		ir = (slot_1_type == 1) ? true : false;
 		size = auxspi_save_size_log_2(ir);
@@ -422,12 +418,12 @@ void hwRestore3in1_b(uint32 size_file)
 	
 	uint8 type = auxspi_save_type(ir);
 	if (type == 3) {
-		displayMessage2A(STR_HW_FORMAT_GAME, false);
+		displayMessage2F(STR_HW_FORMAT_GAME);
 		auxspi_erase(ir);
 	}
 
 	// And finally, write the save!
-	displayMessage2A(STR_HW_WRITE_GAME, false);
+	displayMessage2F(STR_HW_WRITE_GAME);
 	u32 LEN = 0, num_blocks = 0, shift = 0;
 	switch (type) {
 	case 1:
@@ -455,8 +451,7 @@ void hwRestore3in1_b(uint32 size_file)
 	}
 	displayProgressBar(1, 1);
 
-	displayMessage2A(STR_HW_3IN1_RESTORE, false);
-	
+	displayMessage2F(STR_HW_PLEASE_REBOOT);	
 	while (1) {};
 }
 
@@ -464,7 +459,7 @@ void hwRestore3in1_b(uint32 size_file)
 void hwErase()
 {
 	bool ir = (slot_1_type == 1) ? true : false;
-	displayMessage2A(STR_HW_WARN_DELETE, true);
+	displayMessage2F(STR_HW_WARN_DELETE);
 	while (!(keysCurrent() & (KEY_UP | KEY_R | KEY_Y))) {};
 	auxspi_erase(ir);
 }
@@ -491,29 +486,29 @@ void hwBackupFTP(bool dlp)
 		size_blocks = 1 << (uint8(size) - 15);
 
 	// Second: connect to FTP server
-	displayMessage2A(STR_HW_FTP_SEEK_AP, false);
+	displayMessage2F(STR_HW_FTP_SEEK_AP);
 	if (!Wifi_InitDefault(true)) {
-		displayMessage2A(STR_HW_FTP_ERR_AP, true);
+		displayWarning2F(STR_HW_FTP_ERR_AP);
 		while(1);
 	}
-	displayMessage2A(STR_HW_FTP_SEEK_FTP, false);
+	displayMessage2F(STR_HW_FTP_SEEK_FTP);
 	char fullname[512];
 	sprintf(fullname, "%s:%i", ftp_ip, ftp_port);
 	j = 0;
 	while (!FtpConnect(fullname, &buf)) {
 		j++;
 		if (j >= jmax) {
-			displayMessage2A(STR_HW_FTP_ERR_FTP, true);
+			displayWarning2F(STR_HW_FTP_ERR_FTP);
 			while(1);
 		}
 		swiDelay(10000);
 	}
-	displayMessage2A(STR_HW_FTP_LOGIN, false);
+	displayMessage2F(STR_HW_FTP_LOGIN);
 	j = 0;
 	while (!FtpLogin(ftp_user, ftp_pass, buf)) {
 		j++;
 		if (j >= jmax) {
-			displayMessage2A(STR_HW_FTP_ERR_LOGIN, true);
+			displayWarning2F(STR_HW_FTP_ERR_LOGIN);
 			while(1);
 		}
 		swiDelay(10000);
@@ -522,8 +517,8 @@ void hwBackupFTP(bool dlp)
 	char fdir[256] = "";
 	char fname[256] ="";
 	memset(fname, 0, 256);
-	displayMessageA(STR_HW_SELECT_FILE_OW);
-	displayPrintState("FTP: dir"); // TODO: translate me!
+	displayMessageF(STR_HW_SELECT_FILE_OW);
+	displayStateF(STR_HW_FTP_DIR);
 	fileSelect("/", fdir, fname, buf, true, false);
 	bool newfile;
 	if (!fname[0])
@@ -540,12 +535,11 @@ void hwBackupFTP(bool dlp)
 		int tsize = 0;
 		sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
 		while (FtpSize(fname, &tsize, FTPLIB_IMAGE, buf) != 0) {
-			sprintf(txt, stringsGetMessageString(STR_HW_SEEK_UNUSED_FNAME), fname);
-			displayMessage2(txt, false);
+			displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
 			if (cnt < 65536)
 				cnt++;
 			else {
-				displayMessage2A(STR_ERR_NO_FNAME, true);
+				displayWarning2F(STR_ERR_NO_FNAME);
 				while(1);
 			}
 			sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
@@ -553,10 +547,10 @@ void hwBackupFTP(bool dlp)
 	}
 	
 	// Fourth: dump save
-	displayPrintState("");
+	displayStateF(STR_EMPTY);
 	// This may not have to be translated.
+	// FIXME: make this more meaningful!
 	sprintf(fullname, "%s%s", fdir, fname);
-	displayMessage(fullname);
 	FtpAccess(fname, FTPLIB_FILE_WRITE, FTPLIB_IMAGE, buf, &ndata);
 	u32 length = 0x200;
 	if (size < 9)
@@ -569,14 +563,14 @@ void hwBackupFTP(bool dlp)
 			u32 delta = FtpWrite((u8*)&data[out], length-out, ndata);
 			out += delta;
 			if (delta == 0) {
-				displayMessage2A(STR_HW_FTP_READ_ONLY, false);
+				displayMessage2F(STR_HW_FTP_READ_ONLY);
 			} else {
-				displayMessage2("", false);
+				displayMessage2F(STR_EMPTY);
 			}
 			if (delta < length) {
-				displayPrintState(stringsGetMessageString(STR_HW_FTP_SLOW));
+				displayStateF(STR_HW_FTP_SLOW);
 			} else {
-				displayPrintState("");
+				displayStateF(STR_EMPTY);
 			}
 		}
 	}
@@ -586,7 +580,7 @@ void hwBackupFTP(bool dlp)
 	Wifi_DisconnectAP();
 
 	if (dlp) {
-		displayMessage2A(STR_HW_PLEASE_REBOOT, false);
+		displayMessage2F(STR_HW_PLEASE_REBOOT);
 		while(1);
 	}
 }
@@ -600,29 +594,29 @@ void hwRestoreFTP(bool dlp)
 
 	// Dump save and write it to FTP server
 	// First: connect to FTP server
-	displayMessage2A(STR_HW_FTP_SEEK_AP, false);
+	displayMessage2F(STR_HW_FTP_SEEK_AP);
 	if (!Wifi_InitDefault(true)) {
-		displayMessage2A(STR_HW_FTP_ERR_AP, true);
+		displayWarning2F(STR_HW_FTP_ERR_AP);
 		while(1);
 	}
-	displayMessage2A(STR_HW_FTP_SEEK_FTP, false);
+	displayMessage2F(STR_HW_FTP_SEEK_FTP);
 	char fullname[512];
 	sprintf(fullname, "%s:%i", ftp_ip, ftp_port);
 	j = 0;
 	while (!FtpConnect(fullname, &buf)) {
 		j++;
 		if (j >= jmax) {
-			displayMessage2A(STR_HW_FTP_ERR_FTP, true);
+			displayWarning2F(STR_HW_FTP_ERR_FTP);
 			while(1);
 		}
 		swiDelay(10000);
 	}
-	displayMessage2A(STR_HW_FTP_LOGIN, false);
+	displayMessage2F(STR_HW_FTP_LOGIN);
 	j = 0;
 	while (!FtpLogin(ftp_user, ftp_pass, buf)) {
 		j++;
 		if (j >= jmax) {
-			displayMessage2A(STR_HW_FTP_ERR_LOGIN, false);
+			displayWarning2F(STR_HW_FTP_ERR_LOGIN);
 			while(1);
 		}
 		swiDelay(10000);
@@ -632,8 +626,8 @@ void hwRestoreFTP(bool dlp)
 	char fdir[256] = "";
 	char fname[256] ="";
 	memset(fname, 0, 256);
-	displayMessageA(STR_HW_SELECT_FILE);
-	displayPrintState("FTP: dir");
+	displayMessageF(STR_HW_SELECT_FILE);
+	displayStateF(STR_STR, "FTP: dir");
 	fileSelect("/", fdir, fname, buf, false, false);
 	
 	// Third: swap card
@@ -644,10 +638,10 @@ void hwRestoreFTP(bool dlp)
 	uint8 type = auxspi_save_type(ir);
 
 	// Fourth: read file
-	displayPrintState("");
+	displayStateF(STR_EMPTY);
 	FtpChdir(fdir, buf);
+	// FIXME: make this more meaningful!
 	sprintf(fullname, "%s%s", fdir, fname);
-	displayMessage(fullname);
 	u32 LEN = 0, num_blocks = 0, shift = 0;
 	switch (type) {
 	case 1:
@@ -670,16 +664,16 @@ void hwRestoreFTP(bool dlp)
 	bool insecure = ((1 << size) > size_buf);
 	if (insecure) {
 #if 0
-		displayMessage("Save larger than available RAM.\nRestoring will be dangerous!\n\nPress Start + Select to proceed");
+		displayMessageF("Save larger than available RAM.\nRestoring will be dangerous!\n\nPress Start + Select to proceed");
 		while (!(keysCurrent() & (KEY_START | KEY_SELECT)));
 #else
-		displayMessage("Save larger than available RAM.\nRestoring is buggy, so\nI will stop here.\n(Try Rudolphs tools.)");
+		// TODO: translate this message!
+		displayMessage2F(STR_STR, "Save larger than available RAM.\nRestoring is buggy, so\nI will stop here.\n(Try Rudolphs tools.)");
 		while (1);
 #endif
 	}
 	if ((type == 3) && (insecure)) {
-		displayMessage2A(STR_HW_FORMAT_GAME, false);
-		//displayPrintState("Formating Flash chip");
+		displayMessage2F(STR_HW_FORMAT_GAME);
 		auxspi_erase(ir);
 	}
 	FtpAccess(fname, FTPLIB_FILE_READ, FTPLIB_IMAGE, buf, &ndata);
@@ -690,14 +684,14 @@ void hwRestoreFTP(bool dlp)
 		while (in < 512) {
 			in += FtpRead((u8*)&pdata[in], 512-in, ndata);
 			if (in < 512)
-				displayPrintState(stringsGetMessageString(STR_HW_FTP_SLOW));
+				displayStateF(STR_HW_FTP_SLOW);
 			else
-				displayPrintState("");
+				displayStateF(STR_EMPTY);
 		}
 		// does not fit into memory: unsafe mode
 		// TODO: reactivate this!
 		if (insecure) {
-			displayPrintState("Writing save (insecure!)");
+			displayStateF(STR_STR, "Writing save (insecure!)");
 			for (int j = 0; j < 1 << (9-shift); j++) {
 				auxspi_write_data((i << 9)+(j << shift), ((u8*)pdata)+(j<<shift), LEN, type, ir);
 			}
@@ -707,11 +701,11 @@ void hwRestoreFTP(bool dlp)
 	// Write to game (safe mode)
 	if (!insecure) {
 		if (type == 3) {
-			displayMessage2A(STR_HW_FORMAT_GAME, false);
+			displayMessage2F(STR_HW_FORMAT_GAME);
 			auxspi_erase(ir);
 		}
 		for (int i = 0; i < (1 << (size - shift)); i++) {
-			displayMessage2A(STR_HW_WRITE_GAME, false);
+			displayMessage2F(STR_HW_WRITE_GAME);
 			displayProgressBar(i+1, 1 << (size - shift));
 			auxspi_write_data(i << shift, ((u8*)data)+(i<<shift), LEN, type, ir);
 		}
@@ -722,7 +716,7 @@ void hwRestoreFTP(bool dlp)
 	Wifi_DisconnectAP();
 
 	if (dlp) {
-		displayMessage2A(STR_HW_PLEASE_REBOOT, false);
+		displayMessage2F(STR_HW_PLEASE_REBOOT);
 		while(1);
 	}
 }
@@ -735,7 +729,7 @@ void hwBackupGBA(u8 type)
 	
 	if ((type == 1) || (type == 2)) {
 		// This is not to be translated, it will be removed at some point.
-		displayMessage("I can't read this save type\nyet. Please use Rudolphs tool\ninstead.");
+		displayMessageF(STR_STR, "I can't read this save type\nyet. Please use Rudolphs tool\ninstead.");
 		return;
 	}
 	
@@ -747,13 +741,12 @@ void hwBackupGBA(u8 type)
 	if (!fname[0]) {
 		uint32 cnt = 0;
 		sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
-		sprintf(txt, stringsGetMessageString(STR_HW_SEEK_UNUSED_FNAME), fname);
-		displayMessage2(txt, false);
+		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
 		while (fileExists(fname)) {
 			if (cnt < 65536)
 				cnt++;
 			else {
-				displayMessage2A(STR_ERR_NO_FNAME, true);
+				displayWarning2F(STR_ERR_NO_FNAME);
 				while(1);
 			}
 			sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
@@ -761,18 +754,17 @@ void hwBackupGBA(u8 type)
 	}
 	char fullpath[512];
 	sprintf(fullpath, "%s/%s", path, fname);
-	displayMessage(fname);
 	
-	displayMessage2A(STR_HW_GBA_READ, false);
+	displayMessage2F(STR_HW_READ_GAME);
 	uint32 size = gbaGetSaveSize(type);
 	gbaReadSave(data, 0, size, type);
 	
-	displayMessage2A(STR_HW_GBA_DUMP, false);
+	displayMessage2F(STR_HW_WRITE_FILE, fullpath);
 	FILE *file = fopen(fullpath, "wb");
 	fwrite(data, 1, size, file);
 	fclose(file);
 
-	displayPrintState("Done!");
+	displayStateF(STR_STR, "Done!");
 	while(1);
 }
 
@@ -784,7 +776,7 @@ void hwRestoreGBA()
 	
 	if ((type == 1) || (type == 2)) {
 		// This is not to be translated, it will be removed at some point.
-		displayMessage("I can't write this save type\nyet. Please use Rudolphs tool\ninstead.");
+		displayMessageF(STR_STR, "I can't write this save type\nyet. Please use Rudolphs tool\ninstead.");
 		return;
 	}
 	
@@ -795,29 +787,35 @@ void hwRestoreGBA()
 	fileSelect("/", path, fname, 0);
 	char fullpath[512];
 	sprintf(fullpath, "%s/%s", path, fname);
-	//displayMessage(fname);
 
-	sprintf(txt, stringsGetMessageString(STR_HW_GBA_LOAD), fname);
-	displayMessage2A(STR_HW_GBA_LOAD, false);
+	displayMessage2F(STR_HW_READ_FILE, fname);
 	FILE *file = fopen(fullpath, "rb");
 	fread(data, 1, size, file);
 	fclose(file);
 	
 	if ((type == 4) || (type == 5)) {
-		displayMessage2A(STR_HW_FORMAT_GAME, false);
+		displayMessage2F(STR_HW_FORMAT_GAME);
 		gbaFormatSave(type);
 	}
 	
-	displayMessage2A(STR_HW_WRITE_GAME, false);
-	gbaWriteSave(data, 0, size, type);
+	displayMessage2F(STR_HW_WRITE_GAME);
+	gbaWriteSave(0, data, size, type);
 
-	displayMessage2A(STR_HW_PLEASE_REBOOT, false);
+	displayMessage2F(STR_HW_PLEASE_REBOOT);
 	while(1);
 }
 
 void hwEraseGBA()
 {
 	// TODO: implement chip erase!
+	u8 type = gbaGetSaveType();
+	if ((type == 0) || (type > 5))
+		return;
+	
+	memset(data, 0, gbaGetSaveSize(type));
+	
+	switch (type) {
+	}
 }
 
 // -------------------------------------------------

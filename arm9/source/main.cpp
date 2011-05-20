@@ -62,12 +62,12 @@ void mode_dsi()
 	// TODO: test is SD card is present!
 
 	// use 3in1 to buffer data
-	displayPrintState("");
+	displayStateF(STR_EMPTY);
 	displayPrintUpper();
 	displayPrintLower();
 	
 	// DSi mode, does nothing at the moment
-	displayMessage2A(STR_BOOT_MODE_UNSUPPORTED,true);
+	displayWarning2F(STR_BOOT_MODE_UNSUPPORTED);
 	while(1);
 
 	touchPosition touchXY;
@@ -97,11 +97,11 @@ void mode_dsi()
 void mode_slot2()
 {
 	// use slot2 DLDI device to store data
-	displayPrintState("");
+	displayStateF(STR_EMPTY);
 	displayPrintUpper();
 	displayPrintLower();
 	
-	displayMessage2A(STR_BOOT_MODE_UNSUPPORTED,true);
+	displayWarning2F(STR_BOOT_MODE_UNSUPPORTED);
 	while(1);
 	
 	touchPosition touchXY;
@@ -143,11 +143,11 @@ void mode_3in1()
 		char name[13];
 		memcpy(&name[0], &data2.name[0], 12);
 		name[12] = 0;
-		displayMessageA(STR_HW_3IN1_CLEAR_FLAG); // lower screen is used for file browser
+		displayMessageF(STR_HW_3IN1_CLEAR_FLAG); // lower screen is used for file browser
 		hwFormatNor(0, 1); // clear reboot flag
 		hwDump3in1(size, name);
 	}
-	displayMessage("");
+	displayMessageF(STR_EMPTY);
 	displayProgressBar(0,0);
 	displayPrintLower();
 	
@@ -183,7 +183,7 @@ void mode_gba()
 	u8 gbatype = gbaGetSaveType();
 	
 	// use 3in1 to buffer data
-	displayPrintState("");
+	displayStateF(STR_EMPTY);
 	gbatype = gbaGetSaveType();
 	displayPrintUpper();
 	displayPrintLower();
@@ -216,7 +216,7 @@ void mode_gba()
 void mode_wifi()
 {
 	// use 3in1 to buffer data
-	displayPrintState("");
+	displayStateF(STR_EMPTY);
 	displayPrintUpper();
 	displayPrintLower();
 	
@@ -250,7 +250,7 @@ void mode_wifi()
 void mode_dlp()
 {
 	// use non-flash card based exploits (download play or Sudoku?). untested, and does not work yet!
-	displayPrintState("");
+	displayStateF(STR_EMPTY);
 	displayPrintUpper();
 	displayPrintLower();
 	
@@ -273,7 +273,7 @@ void mode_dlp()
 		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
 			displayPrintUpper();
 			hwErase();
-			displayMessage2A(STR_HW_DID_DELETE, true);
+			displayWarning2F(STR_HW_DID_DELETE);
 			while(1);
 		}
 	}
@@ -304,8 +304,7 @@ bool loadIniFile(char* path)
 			ini = ini_open(inipath, "r", "");
 	}
 	if (!ini) {
-		// FIXME
-		displayMessage2A(STR_BOOT_NO_INI,true);
+		displayWarning2F(STR_BOOT_NO_INI);
 		while (1);
 	}
 	
@@ -325,16 +324,15 @@ bool loadIniFile(char* path)
 	
 	ini_locateKey(ini, "slot2");
 	ini_readInt(ini, &slot2);
-	
-	ini_close(ini);
-	
+
 	// load additional Flash chip signatures (JEDEC IDs)
 	ini_locateHeading(ini, "new chips");
 	for (int i = 0; i < EXTRA_ARRAY_SIZE; i++) {
 		int tmp;
 		sprintf(txt, "%i-id", i);
 		ini_locateKey(ini, txt);
-		ini_readInt(ini, &tmp);
+		ini_readString(ini, txt, 256);
+		sscanf(txt, "%x", &extra_id[i]);
 		extra_id[i] = (u32)tmp;
 		//
 		sprintf(txt, "%i-size", i);
@@ -342,6 +340,12 @@ bool loadIniFile(char* path)
 		ini_readInt(ini, &tmp);
 		extra_size[i] = tmp;
 	}
+
+	ini_locateHeading(ini, "");
+	ini_locateKey(ini, "language");
+	ini_readString(ini, txt, 256);
+	
+	ini_close(ini);
 	
 	// delete temp file (which is a remnant of inilib)
 	remove("/tmpfile");
@@ -399,7 +403,7 @@ int main(int argc, char* argv[])
 	// Init DLDI (file system driver)
 	int fat = fatInitDefault();
 	if (fat == 0) {
-		displayMessage2A(STR_BOOT_DLDI_ERROR,true);
+		displayWarning2F(STR_BOOT_DLDI_ERROR);
 		while (1);
 	}
 	
@@ -414,19 +418,22 @@ int main(int argc, char* argv[])
 		loadIniFile(0);
 
 	// load strings
-	stringsLoadFile(0);
+	// "txt" is used as a temp buffer for the language file name
+	stringsLoadFile(txt);
 
 	// prepare the global data buffer
 	data = (u8*)malloc(size_buf);
 	// On my Cyclops, no 2MB buffer is available after loading strings! bad memory management?
 	//  Anyway, we can't do anything except for the following (which restricts the usefulness
 	//  of FTP safe mode)
-	//  possible that no continuous 2 MB are available.
 	while (data == NULL) {
 		size_buf >>= 1;
 		data = (u8*)malloc(size_buf);
 	}
 	
+	// Init the screens
+	displayTitle();
+
 	// okay, we got our HW identified; now branch to the corresponding main function/event handler
 	switch (mode) {
 		case 1:

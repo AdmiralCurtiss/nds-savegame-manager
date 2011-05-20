@@ -53,22 +53,18 @@ void displayInit()
 	videoSetModeSub(MODE_0_2D);
 	vramSetBankC(VRAM_C_SUB_BG);
 	consoleInit(&lowerScreen, 3,BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
+}
 
-	consoleSelect(&upperScreen);
-	iprintf("\n\n\n\n\nDS savegame manager\nVersion 0.2.5 semi-stable\nBy Pokedoc");
+void displayTitle()
+{
+	displayMessageF(STR_TITLE_MSG);
 	
-	displayPrintState("Press (B) to continue");
+	displayStateF(STR_STR, "Press (B) to continue");
 	while (!(keysCurrent() & KEY_B));
 }
 
 void displayPrintUpper()
 {
-	/*
-	//extern uint32 ezflash;
-	extern bool gba;
-	extern uint32 dstype;
-	extern bool slot2;
-	*/
 	bool gba = (mode == 1);
 	u32 dstype = (mode == 3) ? 1 : 0;
 	bool ir = (slot_1_type == 1) ? true : false;
@@ -85,7 +81,7 @@ void displayPrintUpper()
 	iprintf("Special  :\n");
 	iprintf("--- SLOT 2 ---------------------");
 	if (dstype > 0)
-		iprintf("This device has no Slot-2\n");
+		iprintf("This device has no Slot 2\n");
 	else {
 		iprintf("Game ID  :\n");
 		iprintf("Game name:\n");
@@ -127,7 +123,7 @@ void displayPrintUpper()
 		sprintf(&name[0], "Download Play");
 		break;
 	default:
-		sprintf(&name[0], "* Unknown *");
+		sprintf(&name[0], "* ??? *");
 		break;
 	}
 	consoleClear();
@@ -173,10 +169,13 @@ void displayPrintUpper()
 			sprintf(&name[0], "FRAM (%i kB)", 1 << (size - 10));
 			break;
 		case 3:
-			sprintf(&name[0], "Flash (%i kB)", 1 << (size - 10));
+			if (size == 0)
+				sprintf(&name[0], "Flash (? kB, ID=%x)", auxspi_save_jedec_id(ir));
+			else
+				sprintf(&name[0], "Flash (%i kB)", 1 << (size - 10));
 			break;
 		default:
-			sprintf(&name[0], "unknown");
+			sprintf(&name[0], "???");
 			break;
 		}
 	}
@@ -207,7 +206,7 @@ void displayPrintUpper()
 		else if (ezflash == 0x227E2202)
 			sprintf(name, "3in1 (256M V1)");
 		else
-			sprintf(name, "3in1 (unknown type)");
+			sprintf(name, "3in1 (???M)");
 	} else if (gba)
 		sprintf(name, "%.4s", (char*)0x080000ac);
 	else if (slot2)
@@ -311,47 +310,8 @@ void displayPrintLower()
 	iprintf("         .sav -> Game");
 
 	consoleSetWindow(&lowerScreen, 1, 17, 30, 6);
-	iprintf("\n             RESET\n\n");
-	iprintf("    WIPES OUT ALL SAVE DATA\n");
-	iprintf("         ON YOUR GAME !");
-}
-
-void displayMessage(const char *msg)
-{
-  consoleSelect(&upperScreen);
-  consoleSetWindow(0, 0, 16, 32, 6);
-  consoleClear();
-
-  iprintf("%s", msg);
-}
-
-void displayMessageA(int id)
-{
-	displayMessage(stringsGetMessageString(id));
-}
-
-void displayMessage2(const char *msg, bool warn)
-{
-  consoleSelect(&lowerScreen);
-  consoleSetWindow(&lowerScreen, 0, 0, 32, 24);
-  consoleClear();
-
-  if (warn) {
-    iprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-	for (int i = 0; i < 22; i++)
-		iprintf("!                              !");
-    iprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-  }
-  
-  consoleSetWindow(&lowerScreen, 2, 2, 28, 20);
-  consoleClear();
-  
-  iprintf("%s", msg);
-}
-
-void displayMessage2A(int id, bool warn)
-{
-	displayMessage2(stringsGetMessageString(id), warn);
+	iprintf("\n             RESET\n");
+	iprintf(stringsGetMessageString(STR_MM_WIPE));
 }
 
 void displayPrintState(const char *txt)
@@ -363,6 +323,64 @@ void displayPrintState(const char *txt)
   iprintf("%s", txt);
 }
 
+// ----- internal function
+char *ParseLine(char *start, const char *end, int &length)
+{
+	// This function takes a line and does a quick word-wrap, by fitting it into a certain fixed-length line
+	int len = 0;
+	char *cur = start;
+	char *separator = start;
+	
+	while (start < end) {
+		if (*start == '\n') {
+			length = 1;
+			return start;
+		}
+		
+		// look for a working "start" position
+		if ((*start == ' ') || (*start == '\n') || (*start == '\t')) {
+			start++; cur++; separator++;
+			continue;
+		}
+		
+		// do count characters
+		if (len < length) {
+			cur++; len++;
+			if ((*cur == ' ') || (*cur == '\n') || (*cur == '\t') || (*cur == '\0')) {
+				separator = cur;
+				if ((*cur == '\n')  || (*cur == '\0'))
+					break;
+			}
+		} else {
+			// emergency exit
+			if (!separator)
+				separator = cur;
+			break;
+		}
+	}
+	
+	length = separator - start;
+	return start;
+}
+// ------------------
+
+void displayStateF(int id, ...)
+{
+	// prevent flickering
+	swiWaitForVBlank();
+	
+	va_list argp;
+	va_start(argp, id);
+	memset(txt, 0, 256);
+	vsnprintf(txt, 256, stringsGetMessageString(id), argp);
+	va_end(argp);
+	
+	consoleSelect(&upperScreen);
+	consoleSetWindow(0, 0, 22, 32, 1);
+	consoleClear();
+	
+	iprintf("%s", txt);
+}
 
 void displayProgressBar(int cur, int max0)
 {
@@ -403,3 +421,94 @@ void displayProgressBar(int cur, int max0)
   iprintf("%s", buffer);
 }
 
+void displayMessageF(int id, ...)
+{
+	va_list argp;
+	va_start(argp, id);
+	memset(txt, 0, 256);
+	vsnprintf(txt, 256, stringsGetMessageString(id), argp);
+	va_end(argp);
+	
+	consoleSelect(&upperScreen);
+	consoleSetWindow(&upperScreen, 0, 16, 32, 6);
+	consoleClear();
+	
+	char *start = txt;
+	char *end = start + strlen(txt);
+	for (int i = 0; i < 6; i++) {
+		int l;
+		l = 32;
+		start = ParseLine(start, end, l);
+		consoleSetWindow(&upperScreen, 0, i+16, 32, 1);
+		char tmp = *(start+l);
+		*(start+l) = '\0';
+		iprintf(start);
+		*(start+l) = tmp;
+		start += l+1;
+		if (start >= end)
+			break;
+	}
+}
+
+void displayMessage2F(int id, ...)
+{
+	va_list argp;
+	va_start(argp, id);
+	memset(txt, 0, 256);
+	vsnprintf(txt, 256, stringsGetMessageString(id), argp);
+	va_end(argp);
+	
+	consoleSelect(&lowerScreen);
+	consoleSetWindow(&lowerScreen, 0, 0, 32, 24);
+	consoleClear();
+	
+	char *start = txt;
+	char *end = start + strlen(txt);
+	for (int i = 0; i < 20; i++) {
+		int l;
+		l = 28;
+		start = ParseLine(start, end, l);
+		consoleSetWindow(&lowerScreen, 2, i+2, 28, 1);
+		char tmp = *(start+l);
+		*(start+l) = '\0';
+		iprintf(start);
+		*(start+l) = tmp;
+		start += l+1;
+		if (start >= end)
+			break;
+	}
+}
+
+void displayWarning2F(int id, ...)
+{
+	va_list argp;
+	va_start(argp, id);
+	memset(txt, 0, 256);
+	vsnprintf(txt, 256, stringsGetMessageString(id), argp);
+	va_end(argp);
+	
+	consoleSelect(&lowerScreen);
+	consoleSetWindow(&lowerScreen, 0, 0, 32, 24);
+	consoleClear();
+	
+	iprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+	for (int i = 0; i < 22; i++)
+		iprintf("!                              !");
+	iprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+	
+	char *start = txt;
+	char *end = start + strlen(txt);
+	for (int i = 0; i < 20; i++) {
+		int l;
+		l = 28;
+		start = ParseLine(start, end, l);
+		consoleSetWindow(&lowerScreen, 2, i+2, 28, 1);
+		char tmp = *(start+l);
+		*(start+l) = '\0';
+		iprintf(start);
+		*(start+l) = tmp;
+		start += l+1;
+		if (start >= end)
+			break;
+	}
+}

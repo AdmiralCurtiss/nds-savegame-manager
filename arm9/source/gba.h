@@ -68,8 +68,8 @@ uint8 gbaGetSaveType();
 uint32 gbaGetSaveSize(uint8 type = 255);
 uint32 gbaGetSaveSizeLog2(uint8 type = 255);
 
-bool gbaReadSave(u8 *dst, u8 src, u32 len, u8 type);
-bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type);
+bool gbaReadSave(u8 *dst, u32 src, u32 len, u8 type);
+bool gbaWriteSave(u32 dst, u8 *src, u32 len, u8 type);
 bool gbaFormatSave(u8 type);
 
 

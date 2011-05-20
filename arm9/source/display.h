@@ -27,6 +27,7 @@
 #define SAVE_DISPLAY_H
 
 #include <nds/arm9/console.h>
+#include <stdarg.h>
 
 
 extern PrintConsole upperScreen;
@@ -34,19 +35,18 @@ extern PrintConsole lowerScreen;
 
 
 void displayInit();
+void displayTitle();
 
 void displayPrintUpper();
 void displayPrintLower();
 
-void displayMessage(const char *msg);// upper screen
-void displayMessage2(const char *msg, bool warn); // lower screen
+void displayMessageF(int id, ...);
+void displayMessage2F(int id, ...);
+void displayWarning2F(int id, ...);
 
-// ftplib includes this file, and it is pure c, so no operator overloading for now.
-void displayMessageA(int id);// upper screen, string table version
-void displayMessage2A(int id, bool warn); // lower screen, string table version
+void displayStateF(int id, ...);
 
 void displayProgressBar(int cur, int max0);
-void displayPrintState(const char *txt);
 
 
 

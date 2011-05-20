@@ -97,7 +97,7 @@ uint8 auxspi_save_type(bool ir)
 	
 	if ((sr & 0xfd) == 0xF0 && (jedec == 0x00ffffff)) return 1;
 	if ((sr & 0xfd) == 0x00 && (jedec == 0x00ffffff)) return 2;
-	if ((sr & 0xfd) == 0x00 && (jedec != 0x00ffffff)) return 3; // should also cover Pokemon HG/SS
+	if ((sr & 0xfd) == 0x00 && (jedec != 0x00ffffff)) return 3;
 	// TODO: add support for Band Brothers DX (as soon as I know how)
 	
 	return 0;

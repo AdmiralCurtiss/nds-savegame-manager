@@ -45,6 +45,7 @@
 
 #include "display.h"
 #include "globals.h"
+#include "strings.h"
 
 inline u32 min(u32 i, u32 j) { return (i < j) ? i : j;}
 inline u32 max(u32 i, u32 j) { return (i > j) ? i : j;}
@@ -253,7 +254,7 @@ void gbaEepromRead8Bytes(u8 *out, u32 addr, bool short_addr = false)
 	static u32 eeprom = 0x09ffff00;
 
 	// send command to eeprom
-	displayPrintState("Sending command");
+	displayStateF(STR_STR, "Sending command");
 	// commenting this out or not does not have any impact on the EEPROM device. Therefore,
 	//  the following command does not "make" it to the hardware!
 	DC_FlushRange(&buf[0], sizeof(buf));
@@ -267,7 +268,7 @@ void gbaEepromRead8Bytes(u8 *out, u32 addr, bool short_addr = false)
 	//while ((*(u16*)0x09ffff00 & 1) == 0);
 
 	// get answer from eeprom
-	displayPrintState("listening");
+	displayStateF(STR_STR, "listening");
 	DC_FlushRange(&buf[0], sizeof(buf));
 	DMA_SRC(3) = (uint32)eeprom;
 	DMA_DEST(3) = (uint32)&buf[0];
@@ -346,7 +347,7 @@ void gbaEepromWrite8Bytes(u8 *out, u32 addr, bool short_addr = false)
 	}
 	
 	// send command to eeprom
-	displayPrintState("Sending command");
+	displayStateF(STR_STR, "Sending command");
 	static u32 eeprom = 0x09ffff00;
 	DMA_SRC(3) = (uint32)&buf[0];
 	DMA_DEST(3) = (uint32)eeprom;
@@ -356,7 +357,7 @@ void gbaEepromWrite8Bytes(u8 *out, u32 addr, bool short_addr = false)
 	while(DMA_CR(3) & DMA_BUSY);
 
 	// get answer from eeprom
-	displayPrintState("listening");
+	displayStateF(STR_STR, "listening");
 	DMA_SRC(3) = (uint32)eeprom;
 	DMA_DEST(3) = (uint32)&buf[0];
 	// there is a bit for eeprom access, but it only seems to freeze the transfer!?
@@ -381,7 +382,7 @@ void gbaEepromWrite8Bytes(u8 *out, u32 addr, bool short_addr = false)
 #endif
 }
 
-bool gbaReadSave(u8 *dst, u8 src, u32 len, u8 type)
+bool gbaReadSave(u8 *dst, u32 src, u32 len, u8 type)
 {
 	int nbanks = 2; // for type 4,5
 	bool eeprom_long = true;
@@ -465,14 +466,14 @@ bool gbaIsAtmel()
 	//
 	//char txt[128];
 	sprintf(txt, "Man: %x, Dev: %x", man, dev);
-	displayPrintState(txt);
+	displayStateF(STR_STR, txt);
 	if ((man == 0x3d) && (dev == 0x1f))
 		return true;
 	else
 		return false;
 }
 
-bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
+bool gbaWriteSave(u32 dst, u8 *src, u32 len, u8 type)
 {
 	int nbanks = 2; // for type 4,5
 	bool eeprom_long = true;
@@ -482,6 +483,7 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 		eeprom_long = false;
 		}
 	case 2: {
+	/*
 		int start, end;
 		start = src >> 3;
 		end = (src + len - 1) >> 3;
@@ -492,15 +494,16 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 		}
 		memcpy(dst, tmp, len);
 		free(tmp);
+		*/
 		break;
 		}
 	case 3: {
 		// SRAM: blind write
-		u32 start = 0x0a000000 + src;
-		u8 *tmpsrc = (u8*)start;
+		u32 start = 0x0a000000 + dst;
+		u8 *tmpdst = (u8*)start;
 		sysSetBusOwners(true, true);
-		for (u32 i = 0; i < len; i++, tmpsrc++, dst++)
-			*tmpsrc = *dst;
+		for (u32 i = 0; i < len; i++, tmpdst++, src++)
+			*tmpdst = *src;
 			swiDelay(10); // mabe we don't need this, but better safe than sorry
 		break;
 		}
@@ -509,7 +512,7 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 		if (atmel) {
 			// only 64k, no bank switching required
 			u32 len7 = len >> 7;
-			u8 *tmpsrc = (u8*)(0x0a000000+src);
+			u8 *tmpdst = (u8*)(0x0a000000+dst);
 			for (u32 j = 0; j < len7; j++) {
 				u32 ime = enterCriticalSection();
 				*(u8*)0x0a005555 = 0xaa;
@@ -519,11 +522,11 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 				*(u8*)0x0a005555 = 0xa0;
 				swiDelay(10);
 				for (int i = 0; i < 128; i++) {
-					*tmpsrc = *dst;
+					*tmpdst = *src;
 					swiDelay(10);
 				}
 				leaveCriticalSection(ime);
-				while (*tmpsrc != *dst) {swiDelay(10);}
+				while (*tmpdst != *src) {swiDelay(10);}
 			}
 			break;
 		}
@@ -534,7 +537,7 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 		// FIXME: currently, you can only write "all or nothing"
 		nbanks = 2;
 		for (int j = 0; j < nbanks; j++) {
-			displayPrintState("Switching Bank.");
+			displayStateF(STR_STR, "Switching Bank.");
 			*(u8*)0x0a005555 = 0xaa;
 			swiDelay(10);
 			*(u8*)0x0a002aaa = 0x55;
@@ -546,15 +549,15 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 			//
 			u32 start, sublen;
 			if (j == 0) {
-				start = 0x0a000000 + src;
-				sublen = (src < 0x10000) ? min(len, (1 << 16) - src) : 0;
+				start = 0x0a000000 + dst;
+				sublen = (dst < 0x10000) ? min(len, (1 << 16) - dst) : 0;
 			} else if (j == 1) {
-				start = max(0x09ff0000 + src, 0x0a000000);
-				sublen = (src + len < 0x10000) ? 0 : min(len, len - (0x10000 - src));
+				start = max(0x09ff0000 + dst, 0x0a000000);
+				sublen = (dst + len < 0x10000) ? 0 : min(len, len - (0x10000 - dst));
 			}
-			u8 *tmpsrc = (u8*)start;
+			u8 *tmpdst = (u8*)start;
 			sysSetBusOwners(true, true);
-			for (u32 i = 0; i < sublen; i++, tmpsrc++, dst++) {
+			for (u32 i = 0; i < sublen; i++, tmpdst++, src++) {
 				// we need to wait a few cycles before the hardware reacts!
 				*(u8*)0x0a005555 = 0xaa;
 				swiDelay(10);
@@ -563,10 +566,10 @@ bool gbaWriteSave(u8 *dst, u8 src, u32 len, u8 type)
 				*(u8*)0x0a005555 = 0xa0; // write byte command
 				swiDelay(10);
 				//
-				*tmpsrc = *dst;
+				*tmpdst = *src;
 				swiDelay(10);
 				//
-				while (*tmpsrc != *dst) {swiDelay(10);}
+				while (*tmpdst != *src) {swiDelay(10);}
 			}
 		}
 		break;
@@ -582,6 +585,8 @@ bool gbaFormatSave(u8 type)
 			// TODO: eeprom is not supported yet
 			break;
 		case 3:
+			memset(data, 0, 1 << 15);
+			gbaWriteSave(0, data, 1 << 15, 3);
 			break;
 		case 4:
 		case 5:

@@ -36,6 +36,7 @@
 #include <cstdio>
 
 #include "display.h"
+#include "strings.h"
 
 #include "fileselect.h"
 
@@ -155,11 +156,10 @@ void filePrintFileList(const char *dir, int first, int select, int count, bool c
 	consoleSetWindow(&lowerScreen, 0, 18, 32, 6);
 	consoleClear();
 	iprintf("================================");
-	iprintf("Please select a .sav file\n");
-	iprintf("    (A) Select\n");
-	iprintf("    (B) One directory up\n");
 	if (cancel)
-		iprintf("    (L+R) cancel (new file)");
+		iprintf(stringsGetMessageString(STR_FS_WRITE));
+	else
+		iprintf(stringsGetMessageString(STR_FS_READ));
 }
 
 // ========================***************************==============================

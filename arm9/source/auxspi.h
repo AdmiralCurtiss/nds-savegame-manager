@@ -48,4 +48,6 @@ void auxspi_erase(bool ir = false);
 bool auxspi_has_infrared();
 //void auxspi_gpio_init_save();
 
+bool auxspi_is_unknown_type3();
+
 #endif
