@@ -1,0 +1,43 @@
+Version 0.1 (12-5-2010)
+
+- Initial release
+
+Version 0.1.1 (12-7-2010)
+
+- Fix broken restore sequence (you now need to press (B) on the start screen, instead of (A))
+- Fixes and improvements to the restore function (verifies that .sav size >= save chip size, and that a save chip is present at all)
+
+Version 0.2 (12-30-2010)
+
+- Add an ini file (using libini by Simon White); drop it in the same directory as the homebrew or in the root folder if it does not work
+- Add Wifi backup/restore mode (using ftplib by Thomas Pfau)
+- Add File browsing
+- Add (very experimental) Slot-2 Flash Card detection routine. If this works as expected, I will add a full Slot-2 based backup mechanism later.
+- (hopefully) fix some issues with the EZFlash 3in1
+
+Version 0.2.1 (1-9-2011)
+
+- Definitely fix issues with EZFlash 3in1 mode on the EZFlash Vi (and probably several other cards as well).
+
+Version 0.2.2 (2-12-2011)
+
+- Fix more glitches with older EZFlash 3in1s. Enable 1-pass restore process.
+- Add safety mechanism for WiFi restore process; if the file transfer fails, nothing will be deleted.
+
+Version 0.2.3 (3-4-2011)
+
+- Fix a 3in1 backup bug introduced with 0.2.2, dumping works again.
+- Improves stability of the WiFi backup/restore processes. The program will no longer freak out if something interferes with the transfer.
+- Adds partial GBA backup/restore mode (EEPROM is not supported yet).
+
+Version 0.2.4 (4-10-2011)
+
+- Modify 3in1 backup path so that it supports 3in1 with dead battery.
+- Make it clearer when FTP mode has hit a small delay and the program is trying to continue.
+- Program now makes use of lower screen for most messages, which allows longer, more detailled messages.
+- Adds a Readme file/Manual to the program.
+
+Version 0.2.5 (5-??-2011)
+
+- Adds the ability to translate most parts of the user interface.
+- Various stability fixes.
