@@ -75,6 +75,9 @@ void hwBackupGBA(u8 type);
 void hwRestoreGBA();
 void hwEraseGBA();
 
+void hwBackupSlot2();
+void hwRestoreSlot2();
+
 void hwFormatNor(uint32 page, uint32 count);
 
 uint32 hwGrab3in1();

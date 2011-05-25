@@ -101,8 +101,8 @@ void mode_slot2()
 	displayPrintUpper();
 	displayPrintLower();
 	
-	displayWarning2F(STR_BOOT_MODE_UNSUPPORTED);
-	while(1);
+	//displayWarning2F(STR_BOOT_MODE_UNSUPPORTED);
+	//while(1);
 	
 	touchPosition touchXY;
 	while(1) {
@@ -111,20 +111,22 @@ void mode_slot2()
 		
 		// backup
 		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
-			//displayPrintUpper();
-			//hwBackupGBA();
+			hwBackupSlot2();
+			displayPrintLower();
 		}
 		
 		// restore
 		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
-			//displayPrintUpper();
-			//hwRestoreGBA();
+			hwRestoreSlot2();
+			displayPrintLower();
 		}
 		
 		// erase
 		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
-			//displayPrintUpper();
-			//hwEraseGBA();
+			swap_cart();
+			displayPrintUpper();
+			hwErase();
+			displayPrintLower();
 		}
 	}
 }
@@ -304,7 +306,8 @@ bool loadIniFile(char* path)
 			ini = ini_open(inipath, "r", "");
 	}
 	if (!ini) {
-		displayWarning2F(STR_BOOT_NO_INI);
+		//displayWarning2F(STR_BOOT_NO_INI);
+		iprintf("could not find ini file!");
 		while (1);
 	}
 	
@@ -401,9 +404,11 @@ int main(int argc, char* argv[])
 	mode = hwDetect();
 	
 	// Init DLDI (file system driver)
+	sysSetBusOwners(true, true);
 	int fat = fatInitDefault();
 	if (fat == 0) {
-		displayWarning2F(STR_BOOT_DLDI_ERROR);
+		//displayWarning2F(STR_BOOT_DLDI_ERROR);
+		iprintf("DLDI error");
 		while (1);
 	}
 	
@@ -416,6 +421,9 @@ int main(int argc, char* argv[])
 		loadIniFile(argv[0]);
 	else
 		loadIniFile(0);
+	
+	if (slot2)
+		mode = 4;
 
 	// load strings
 	// "txt" is used as a temp buffer for the language file name

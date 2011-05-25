@@ -172,8 +172,10 @@ u32 hwDetect()
 	//  the same microSD card between Slot 1 and Slot 2, this should be the safest mode.
 	// (If you know a smarter way of doing this, feel free to commit a patch!)
 	//
-	if (slot2)
-		return 4;
+	// EDIT: and we can't test this here, since the ini file has not been parsed yet!
+	//
+	//if (slot2)
+		//return 4;
 
 	// Try to identify download play mode. This also introduces various complications:
 	// - The latest libnds versions include code for the SD-slot on the DSi. It does not work
@@ -462,6 +464,126 @@ void hwErase()
 	displayMessage2F(STR_HW_WARN_DELETE);
 	while (!(keysCurrent() & (KEY_UP | KEY_R | KEY_Y))) {};
 	auxspi_erase(ir);
+}
+
+// --------------------------------------------------------
+void hwBackupSlot2()
+{
+	u32 size_blocks = 0;
+	
+	swap_cart();
+	displayPrintUpper();
+
+	bool ir = (slot_1_type == 1) ? true : false;
+	uint32 size = auxspi_save_size_log_2(ir);
+	uint8 type = auxspi_save_type(ir);
+
+	// just select a filename, no extra work required!
+	char path[256];
+	char fname[256] = "";
+	fileSelect("/", path, fname, 0, true, false);
+	
+	// look for an unused filename
+	if (!fname[0]) {
+		sNDSHeader nds;
+		cardReadHeader((u8*)&nds);
+		uint32 cnt = 0;
+		sprintf(fname, "/%.12s.%i.sav", nds.gameTitle, cnt);
+		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
+		while (fileExists(fname)) {
+			if (cnt < 65536)
+				cnt++;
+			else {
+				displayWarning2F(STR_ERR_NO_FNAME);
+				while(1);
+			}
+			sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
+		}
+	}
+	char fullpath[256];
+	sprintf(fullpath, "%s/%s", path, fname);
+	displayMessage2F(STR_HW_WRITE_FILE, fullpath);
+	
+	FILE *file = fopen(fullpath, "wb");
+	if (size < 8)
+		size_blocks = 1;
+	else
+		size_blocks = 1 << (size - 8);
+	// Slot 2 DLDI drivers don't seem to support writing big blocks!
+	u32 LEN = min(1 << size, 0x100);
+	for (u32 i = 0; i < size_blocks; i++) {
+		displayProgressBar(i+1, size_blocks);
+		auxspi_read_data(i << 8, data, LEN, type, ir);
+		fwrite(data, 1, LEN, file);
+	}
+	fclose(file);
+	
+	displayProgressBar(0,0);
+	displayMessageF(STR_EMPTY);
+}
+
+void hwRestoreSlot2()
+{
+	// First, swap in a new game
+	swap_cart();
+	bool ir = (slot_1_type == 1) ? true : false;
+	uint32 size = auxspi_save_size_log_2(ir);
+	uint8 type = auxspi_save_type(ir);
+	displayPrintUpper();
+
+	// second, select a save file
+	char path[256];
+	char fname[256];
+	memset(fname, 0, 256);
+	displayMessageF(STR_HW_SELECT_FILE); // lower screen is used for file browser
+	fileSelect("/", path, fname, 0, false, false);
+	char msg[256];
+	// This does not have to be translated.
+	// FIXME: make this more meaningful!
+	sprintf(msg, "%s/%s", path, fname);
+	
+	FILE *file = fopen(msg, "rb");
+	if (!file) {
+		iprintf("Error!");
+		while (1);
+	}
+	
+	// 2a, format game if required
+	if (type == 3) {
+		displayMessage2F(STR_HW_FORMAT_GAME);
+		auxspi_erase(ir);
+	}
+	
+	// and third, write save
+	displayMessage2F(STR_HW_WRITE_GAME);
+	u32 LEN = 0, num_blocks = 0, shift = 0;
+	switch (type) {
+	case 1:
+		shift = 4; // 16 bytes
+		break;
+	case 2:
+		shift = 5; // 32 bytes
+		break;
+	case 3:
+		shift = 8; // 256 bytes
+		break;
+	default:
+		return;
+	}
+	LEN = 1 << shift;
+	num_blocks = 1 << (size - shift);
+
+	for (unsigned int i = 0; i < num_blocks; i++) {
+		if (i % (num_blocks >> 6) == 0)
+			displayProgressBar(i+1, num_blocks);
+		fread(data, 1, LEN, file);
+		sysSetBusOwners(true, true);
+		auxspi_write_data(i << shift, data, LEN, type, ir);
+	}
+	fclose(file);
+	
+	displayProgressBar(0,0);
+	displayMessageF(STR_EMPTY);
 }
 
 // ------------------------------------------------------------
