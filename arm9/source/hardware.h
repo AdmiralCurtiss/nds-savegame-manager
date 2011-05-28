@@ -27,6 +27,7 @@
 #define HARDWARE_H
 
 #include <nds.h>
+#include <fat.h>
 #include <sys/unistd.h>
 
 #define RS_BACKUP 0x4b434142

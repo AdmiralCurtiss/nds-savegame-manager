@@ -25,6 +25,7 @@
  
 #include <nds.h>
 #include <fat.h>
+#include <nds/arm9/dldi.h>
 
 #include <sys/dir.h>
 #include <nds/arm9/console.h>
@@ -100,9 +101,6 @@ void mode_slot2()
 	displayStateF(STR_EMPTY);
 	displayPrintUpper();
 	displayPrintLower();
-	
-	//displayWarning2F(STR_BOOT_MODE_UNSUPPORTED);
-	//while(1);
 	
 	touchPosition touchXY;
 	while(1) {
@@ -256,6 +254,10 @@ void mode_dlp()
 	displayPrintUpper();
 	displayPrintLower();
 	
+	// DSi mode, does nothing at the moment
+	displayMessage2F(STR_STR, "I did not expect that you can trigger this mode at all!");
+	while(1);
+
 	touchPosition touchXY;
 	while(1) {
 		swiWaitForVBlank();
@@ -325,8 +327,8 @@ bool loadIniFile(char* path)
 	ini_readInt(ini, &ir_delay);
 	ir_delay = max(ir_delay, 1000);
 	
-	ini_locateKey(ini, "slot2");
-	ini_readInt(ini, &slot2);
+	if (ini_locateKey(ini, "slot2"))
+		ini_readInt(ini, &slot2);
 
 	// load additional Flash chip signatures (JEDEC IDs)
 	ini_locateHeading(ini, "new chips");
@@ -335,7 +337,7 @@ bool loadIniFile(char* path)
 		sprintf(txt, "%i-id", i);
 		ini_locateKey(ini, txt);
 		ini_readString(ini, txt, 256);
-		sscanf(txt, "%x", &extra_id[i]);
+		sscanf(txt, "%x", &tmp);
 		extra_id[i] = (u32)tmp;
 		//
 		sprintf(txt, "%i-size", i);
@@ -400,9 +402,6 @@ int main(int argc, char* argv[])
 	// Init the screens
 	displayInit();
 
-	// detect hardware
-	mode = hwDetect();
-	
 	// Init DLDI (file system driver)
 	sysSetBusOwners(true, true);
 	int fat = fatInitDefault();
@@ -411,18 +410,24 @@ int main(int argc, char* argv[])
 		iprintf("DLDI error");
 		while (1);
 	}
+	iprintf("Found DLDI: %s\n", io_dldi_data->friendlyName);
+	
+	// detect hardware
+	mode = hwDetect();
 	
 	// Load the ini file with the FTP settings and more options
 	for (int i = 0; i < EXTRA_ARRAY_SIZE; i++) {
 		extra_id[i] = 0xff000000;
 		extra_size[i] = 0;
 	}
+	iprintf("Loading INI file\n");
 	if (has_argv(argc, argv))
 		loadIniFile(argv[0]);
 	else
 		loadIniFile(0);
+	iprintf("Done!\n");
 	
-	if (slot2)
+	if (slot2 > 0)
 		mode = 4;
 
 	// load strings

@@ -170,7 +170,7 @@ void displayPrintUpper()
 			break;
 		case 3:
 			if (size == 0)
-				sprintf(&name[0], "Flash (? kB, ID=%x)", auxspi_save_jedec_id(ir));
+				sprintf(&name[0], "Flash (ID:%x)", auxspi_save_jedec_id(ir));
 			else
 				sprintf(&name[0], "Flash (%i kB)", 1 << (size - 10));
 			break;
@@ -209,7 +209,7 @@ void displayPrintUpper()
 			sprintf(name, "3in1 (???M)");
 	} else if (gba)
 		sprintf(name, "%.4s", (char*)0x080000ac);
-	else if (slot2)
+	else if (slot2 > 0)
 		sprintf(name, "Flash Card");
 	else if (dstype == 0)
 		sprintf(name, "----");
@@ -224,7 +224,7 @@ void displayPrintUpper()
 		sprintf(name, "3in1");
 	else if (gba)
 		sprintf(name, "%.12s", (char*)0x080000a0);
-	else if (slot2)
+	else if (slot2 > 0)
 		sprintf(name, "Flash Card");
 	else if (dstype == 0)
 		sprintf(name, "----");
@@ -256,7 +256,7 @@ void displayPrintUpper()
 				sprintf(name, "(none)");
 		}
 	}
-	else if (slot2)
+	else if (slot2 > 0)
 		sprintf(name, "Flash Card");
 	else if (dstype == 0)
 		sprintf(name, "----");
@@ -272,7 +272,7 @@ void displayPrintUpper()
 	else if (gba)
 		// TODO: test for RTC, add function for syncing RTC?
 		sprintf(name, "???");
-	else if (slot2)
+	else if (slot2 > 0)
 		sprintf(name, "----");
 	else if (dstype == 0)
 		sprintf(name, "----");

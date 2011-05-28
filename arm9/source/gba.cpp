@@ -51,26 +51,6 @@ inline u32 min(u32 i, u32 j) { return (i < j) ? i : j;}
 inline u32 max(u32 i, u32 j) { return (i > j) ? i : j;}
 
 
-bool slot2Init()
-{
-	static bool doonce = false;
-	static bool init_3in1 = false;
-	
-	if (doonce)
-		return init_3in1;
-	
-	doonce = true;
-	OpenNorWrite();
-	uint32 test = ReadNorFlashID();
-	CloseNorWrite();
-	
-	init_3in1 = test;
-	if (test)
-		return true;
-	else
-		return false;
-}
-
 
 // -----------------------------------------------------
 #define MAGIC_EEPR 0x52504545
@@ -110,32 +90,6 @@ cartTypeGBA GetSlot2Type(uint32 id)
 	else {
 		return CART_GBA_GAME;
 	}
-};
-
-void IdentifySlot2(dataSlot2 &data)
-{
-// FIXME...
-#if 0
-	// Identify an EZFlash 3in1
-	OpenNorWrite();
-	cartTypeGBA ezflash = slot2IsEZFlash3in1(data.ez_ID);
-	//chip_reset();
-	CloseNorWrite();
-	if (ezflash != CART_GBA_NONE) {
-    data.type = cartTypeGBA(ezflash);
-    return; // 3in1 has no classic save memory
-  } else {
-    // it's not a 3in1
-    sGBAHeader *gba = (sGBAHeader*)0x08000000;
-  	memcpy(&data.name[0], &gba->title[0], 12);
-	  data.name[12] = 0;
-	  memcpy(&data.iid, &gba->gamecode[0], 4);
-	  data.cid[4] = 0;
-		data.type = GetSlot2Type(data.iid);
-  }
-
-	data.save = GetSlot2SaveType(data.type);
-#endif
 };
 
 // -----------------------------------------------------------

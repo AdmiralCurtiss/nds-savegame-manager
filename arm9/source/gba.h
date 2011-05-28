@@ -58,9 +58,6 @@ struct dataSlot2 {
 
 cartTypeGBA GetSlot2Type(uint32 id);
 saveTypeGBA GetSlot2SaveType(cartTypeGBA type);
-void IdentifySlot2(dataSlot2 &data);
-
-bool slot2Init();
 
 // --------------------
 bool gbaIsGame();

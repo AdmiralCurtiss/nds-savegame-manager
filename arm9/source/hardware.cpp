@@ -26,6 +26,7 @@
 
 #include <nds.h>
 #include <fat.h>
+#include <nds/arm9/dldi.h>
 
 #include <nds/interrupts.h>
 #include <nds/arm9/console.h>
@@ -127,6 +128,60 @@ bool swap_card_game(uint32 size)
 	return false;
 }
 
+// Since there are no new Slot 2 cards out there, we test the presence of Slot 2
+//  mode by looking at the DLDI driver IDs.
+bool hwDetectSlot2DLDI()
+{
+	// The driver name is stored in io_dldi_data->friendlyName
+	
+	// EZ Flash 4
+	if (!strnicmp(io_dldi_data->friendlyName, "EZ Flash 4", 10))
+		return true;
+
+	// CycloDS (Slot 2)
+	if (!strnicmp(io_dldi_data->friendlyName, "CycloDS", 7)
+		&& strnicmp(io_dldi_data->friendlyName, "CycloDS Evolution", 17))
+		return true;
+
+	// Ewin2
+	if (!strnicmp(io_dldi_data->friendlyName, "Ewin2", 5))
+		return true;
+
+	// G6 Lite
+	if (!strnicmp(io_dldi_data->friendlyName, "G6 Lite DLDI", 12))
+		return true;
+
+	// GBA Movie Player (CF and SD versions)
+	if (!strnicmp(io_dldi_data->friendlyName, "GBA Movie Player", 16))
+		return true;
+
+	// M3 (CF and SD versions)
+	if (!strnicmp(io_dldi_data->friendlyName, "M3 Adapter", 10))
+		return true;
+	
+	// Max Media Dock
+	if (!strnicmp(io_dldi_data->friendlyName, "Max Media Dock", 14))
+		return true;
+	
+	// Neo2
+	if (!strnicmp(io_dldi_data->friendlyName, "Neo2", 4))
+		return true;
+	
+	// Supercard (CF/SD)
+	if (!strnicmp(io_dldi_data->friendlyName, "SuperCard (", 11))
+		return true;
+	
+	// Supercard (lite)
+	if (!strnicmp(io_dldi_data->friendlyName, "SuperCard Lite", 14))
+		return true;
+	
+	// Supercard (Rumble)
+	if (!strnicmp(io_dldi_data->friendlyName, "SuperCard Rumble", 16))
+		return true;
+	
+	return false;
+}
+
 // This function is called on boot; it detects the hardware configuration and selects the mode.
 u32 hwDetect()
 {
@@ -140,8 +195,29 @@ u32 hwDetect()
 	}
 	size_buf = 1 << 21; // 2 MB memory buffer
 	
-	// Identify Slot 2 device.
-	// First, look for an EZFlash 3in1
+	// Identify Slot 2 device.	
+	// First, look for a Slot 2 flash card. This must be done before any 3in1 Test, because
+	//  the EZFlash 4 also detects as a 3in1.
+
+	// Detecting slot 2 flash cards is very evil:
+	// - They don't usually support argv, so we can't simply test that we are
+	//  running from "fat2".
+	// - We need a passme compatible slot 1 device, i.e. we can't verify that
+	//  there is a flash card in slot 1 (which usually is).
+	// - There is only a limited number of Slot 2 flash cards on the market, so
+	//  we test for this. We look for a valid Slot 2 DLDI driver name, which pretty
+	//  much ensures that we are writing to Slot 2.
+	//
+	// ... HOWEVER: We are also using a Slot 2 ini parameter, so WiFi mode can also be
+	//  accessed from Slot 2 (if you need it).
+	//
+	if (hwDetectSlot2DLDI()) {
+		slot2 = 1;
+		return 4;
+	} else
+		slot2 = 0;
+
+	// Look for an EZFlash 3in1
 	uint32 ime = enterCriticalSection();
 	sysSetBusOwners(true, true);
 	OpenNorWrite();
@@ -155,27 +231,6 @@ u32 hwDetect()
 	// Okay, maybe it is a regular GBA game instead
 	if (gbaIsGame())
 		return 1;
-	
-	// Maybe it is a Slot 2 flash card.
-
-	// Detecting slot 2 flash cards is very evil:
-	// - They don't usually support argv, so we can't simply test that we are
-	//  running from "fat2".
-	// - We need a passme compatible slot 1 device, i.e. we can't verify that
-	//  there is a flash card in slot 1 (which usually is).
-	// - There is only a limited number of Slot 2 flash cards on the market, so
-	//  we could test for this (I think there is a library for this). But if we
-	//  boot from Slot 1, a positive Slot 2 test does not mean that we did boot
-	//  from there - the card may be sitting there unused!
-	//
-	// --> So we select slot 2 mode the "dumb" way - with an ini parameter. Unless you swap
-	//  the same microSD card between Slot 1 and Slot 2, this should be the safest mode.
-	// (If you know a smarter way of doing this, feel free to commit a patch!)
-	//
-	// EDIT: and we can't test this here, since the ini file has not been parsed yet!
-	//
-	//if (slot2)
-		//return 4;
 
 	// Try to identify download play mode. This also introduces various complications:
 	// - The latest libnds versions include code for the SD-slot on the DSi. It does not work
