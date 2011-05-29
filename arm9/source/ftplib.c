@@ -1451,3 +1451,97 @@ GLOBALDEF int FtpAccessBuf(const char *path, int typ, int mode, netbuf *nControl
     return 1;
 }
 
+/*
+ * FtpAccessPos - return a handle for a data stream, starting at some offset "pos"
+ *
+ * return 1 if successful, 0 otherwise
+ */
+GLOBALDEF int FtpAccessPos(const char *path, int typ, int mode, int pos, netbuf *nControl,
+    netbuf **nData)
+{
+    char buf[256];
+    int dir;
+    if ((path == NULL) &&
+        ((typ == FTPLIB_FILE_WRITE) || (typ == FTPLIB_FILE_READ)))
+    {
+	sprintf(nControl->response,
+                "Missing path argument for file transfer\n");
+	return 0;
+    }
+	sprintf(buf, "TYPE %c", mode);
+	if (!FtpSendCmd(buf, '2', nControl))
+	return 0;
+    switch (typ)
+    {
+      case FTPLIB_DIR:
+	strcpy(buf,"NLST");
+	dir = FTPLIB_READ;
+	break;
+      case FTPLIB_DIR_VERBOSE:
+	strcpy(buf,"LIST");
+	dir = FTPLIB_READ;
+	break;
+      case FTPLIB_FILE_READ:
+	strcpy(buf,"RETR");
+	dir = FTPLIB_READ;
+	break;
+      case FTPLIB_FILE_WRITE:
+	strcpy(buf,"STOR");
+	dir = FTPLIB_WRITE;
+	break;
+      default:
+	sprintf(nControl->response, "Invalid open type %d\n", typ);
+	return 0;
+    }
+    if (path != NULL)
+    {
+        int i = strlen(buf);
+        buf[i++] = ' ';
+        if ((strlen(path) + i) >= sizeof(buf))
+            return 0;
+        strcpy(&buf[i],path);
+    }
+    if (FtpOpenPort(nControl, nData, mode, dir) == -1)
+	return 0;
+	// seek start position
+	char buf2[256];
+	sprintf(buf2, "REST %i", pos);
+    if (!FtpSendCmd(buf2, '3', nControl))
+    {
+	FtpClose(*nData);
+	*nData = NULL;
+	return 0;
+    }
+	// start transfer
+    if (!FtpSendCmd(buf, '1', nControl))
+    {
+	FtpClose(*nData);
+	*nData = NULL;
+	return 0;
+    }
+    (*nData)->ctrl = nControl;
+    nControl->data = *nData;
+    if (nControl->cmode == FTPLIB_PORT)
+    {
+	if (!FtpAcceptConnection(*nData,nControl))
+	{
+	    FtpClose(*nData);
+	    *nData = NULL;
+	    nControl->data = NULL;
+	    return 0;
+	}
+    }
+    return 1;
+}
+
+GLOBALREF int FtpCloseAccess(netbuf *nControl, netbuf *nData)
+{
+    char buf[256];
+	strcpy(buf,"ABOR");
+	// seek start position
+    if (!FtpSendCmd(buf, '2', nControl))
+    {
+	return 0;
+    }
+    return 1;
+}

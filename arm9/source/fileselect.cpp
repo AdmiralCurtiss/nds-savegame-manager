@@ -37,12 +37,13 @@
 
 #include "display.h"
 #include "strings.h"
+#include "globals.h"
 
 #include "fileselect.h"
 
 
-extern u8 *data;
-extern u32 size_buf;
+//extern u8 *data;
+//extern u32 size_buf;
 
 // ---------------------------------------------------------------------------------
 void ftpGetFileList(const char *dir, netbuf *ctrl, int &num)

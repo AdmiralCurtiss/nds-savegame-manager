@@ -43,10 +43,9 @@ void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type = 0, bool 
 void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type = 0, bool ir = false);
 void auxspi_disable_infrared();
 void auxspi_erase(bool ir = false);
-//void auxspi_wait_wip();
+void auxspi_erase_sector(u32 sector, bool ir = false);
 
 bool auxspi_has_infrared();
-//void auxspi_gpio_init_save();
 
 bool auxspi_is_unknown_type3();
 

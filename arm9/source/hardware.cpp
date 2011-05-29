@@ -58,6 +58,16 @@ static u32 pitch = 0x40000;
 
 
 // ---------------------------------------------------------------------
+u8 log2trunc(u32 size0)
+{	
+	u8 size = 1;
+	while (size0 > (1 << size)) {
+		size++;
+	}
+	return size;
+}
+
+// ---------------------------------------------------------------------
 bool swap_cart()
 {
 	sNDSHeader nds;
@@ -407,18 +417,12 @@ void hwRestore3in1()
 	displayMessageF(STR_HW_SELECT_FILE); // lower screen is used for file browser
 	fileSelect("/", path, fname, 0, false, false);
 	char msg[256];
-	// This does not have to be translated.
-	// FIXME: make this more meaningful!
 	sprintf(msg, "%s/%s", path, fname);
 	
 	FILE *file = fopen(msg, "rb");
 	uint32 size0 = fileSize(msg);
 	
-	uint8 size = 1;
-	// crude log2 function
-	while (size0 > (1 << size)) {
-		size++;
-	}
+	uint8 size = log2trunc(size0);
 	int size_blocks = 1 << max(0, int8(size) - 18); // ... in units of 0x40000 bytes - that's 256 kB
 	
 	displayMessage2F(STR_HW_3IN1_FORMAT_NOR);
@@ -647,12 +651,12 @@ void hwBackupFTP(bool dlp)
 	netbuf *buf, *ndata;
 	int j;
 	static int jmax = 10;
-	bool ir = (slot_1_type == 1) ? true : false;
 
 	// Dump save and write it to FTP server
 	// First: swap card
 	if (!dlp)
 		swap_cart();
+	bool ir = (slot_1_type == 1) ? true : false;
 	displayPrintUpper();
 	uint8 size = auxspi_save_size_log_2(ir);
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
@@ -669,10 +673,9 @@ void hwBackupFTP(bool dlp)
 		while(1);
 	}
 	displayMessage2F(STR_HW_FTP_SEEK_FTP);
-	char fullname[512];
-	sprintf(fullname, "%s:%i", ftp_ip, ftp_port);
+	sprintf(txt, "%s:%i", ftp_ip, ftp_port);
 	j = 0;
-	while (!FtpConnect(fullname, &buf)) {
+	while (!FtpConnect(txt, &buf)) {
 		j++;
 		if (j >= jmax) {
 			displayWarning2F(STR_HW_FTP_ERR_FTP);
@@ -697,6 +700,8 @@ void hwBackupFTP(bool dlp)
 	displayMessageF(STR_HW_SELECT_FILE_OW);
 	displayStateF(STR_HW_FTP_DIR);
 	fileSelect("/", fdir, fname, buf, true, false);
+	displayMessageF(STR_EMPTY);
+	displayStateF(STR_EMPTY);
 	bool newfile;
 	if (!fname[0])
 		newfile = true;
@@ -725,15 +730,11 @@ void hwBackupFTP(bool dlp)
 	
 	// Fourth: dump save
 	displayStateF(STR_EMPTY);
-	// This may not have to be translated.
-	// FIXME: make this more meaningful!
-	sprintf(fullname, "%s%s", fdir, fname);
 	FtpAccess(fname, FTPLIB_FILE_WRITE, FTPLIB_IMAGE, buf, &ndata);
-	u32 length = 0x200;
-	if (size < 9)
-		length = 1 << size;
-	for (int i = 0; i < (1 << (size - 9)); i++) {
-		displayProgressBar(i+1, (size_blocks << 6));
+	u32 length = 1 << 9;
+	int num_ftp_blocks = 1 << (size - 9);
+	for (int i = 0; i < num_ftp_blocks; i++) {
+		displayProgressBar(i+1, num_ftp_blocks);
 		auxspi_read_data(i << 9, (u8*)&data[0], length, type, ir);
 		u32 out = 0;
 		while (out < length) {
@@ -751,8 +752,8 @@ void hwBackupFTP(bool dlp)
 			}
 		}
 	}
-	FtpClose(ndata);
-	FtpQuit(ndata);
+	FtpCloseAccess(buf, ndata);
+	FtpQuit(buf);
 	
 	Wifi_DisconnectAP();
 
@@ -760,6 +761,64 @@ void hwBackupFTP(bool dlp)
 		displayMessage2F(STR_HW_PLEASE_REBOOT);
 		while(1);
 	}
+	
+	displayProgressBar(0,0);
+	displayMessageF(STR_EMPTY);
+}
+
+// an internal function used to read big files from the FTP server
+bool hwRestoreFTPPartial(u32 ofs, u32 size, u32 type, netbuf *ndata, bool ir)
+{
+	int num_blocks_ftp = 1 << (size - 9);
+	u8 *pdata = data;
+	for (int i = 0; i < num_blocks_ftp; i++) {
+		displayProgressBar(i+1, num_blocks_ftp);
+		int in = 0;
+		while (in < 512) {
+			int delta = FtpRead((u8*)&pdata[in], 512-in, ndata);
+			in += delta;
+			if (delta < 512)
+				displayStateF(STR_HW_FTP_SLOW);
+			else
+				displayStateF(STR_EMPTY);
+		}
+		pdata += 512;
+	}
+
+	// Write to game (safe mode)
+	u32 LEN = 0, num_blocks = 0, shift = 0;
+	switch (type) {
+	case 1:
+		shift = 4; // 16 bytes
+		break;
+	case 2:
+		shift = 5; // 32 bytes
+		break;
+	case 3:
+		shift = 8; // 256 bytes
+		break;
+	default:
+		return false;
+	}
+	LEN = 1 << shift;
+	num_blocks = 1 << (size - shift);
+	if (type == 3) {
+		displayMessage2F(STR_HW_FORMAT_GAME);
+		u32 sector = ofs >> 16;
+		u32 num = max(u32(0), size-16);
+		for (int i = 0; i < (1 << num); i++) {
+			displayProgressBar(i+1, 1 << num);
+			auxspi_erase_sector(sector+i, ir);
+		}
+		displayProgressBar(0,0);
+	}
+	displayMessage2F(STR_HW_WRITE_GAME);
+	for (int i = 0; i < (1 << (size - shift)); i++) {
+		displayProgressBar(i+1, 1 << (size - shift));
+		auxspi_write_data(ofs + (i << shift), ((u8*)data)+(i<<shift), LEN, type, ir);
+	}
+	
+	return true;
 }
 
 void hwRestoreFTP(bool dlp)
@@ -767,7 +826,6 @@ void hwRestoreFTP(bool dlp)
 	netbuf *buf, *ndata;
 	int j;
 	static int jmax = 10;
-	bool ir = (slot_1_type == 1) ? true : false;
 
 	// Dump save and write it to FTP server
 	// First: connect to FTP server
@@ -804,91 +862,34 @@ void hwRestoreFTP(bool dlp)
 	char fname[256] ="";
 	memset(fname, 0, 256);
 	displayMessageF(STR_HW_SELECT_FILE);
-	displayStateF(STR_STR, "FTP: dir");
+	displayStateF(STR_HW_FTP_DIR);
 	fileSelect("/", fdir, fname, buf, false, false);
+	displayMessageF(STR_EMPTY);
+	displayStateF(STR_EMPTY);
 	
 	// Third: swap card
 	if (!dlp)
 		swap_cart();
 	displayPrintUpper();
+	bool ir = (slot_1_type == 1) ? true : false;
 	uint8 size = auxspi_save_size_log_2(ir);
 	uint8 type = auxspi_save_type(ir);
 
 	// Fourth: read file
-	displayStateF(STR_EMPTY);
-	FtpChdir(fdir, buf);
-	// FIXME: make this more meaningful!
-	sprintf(fullname, "%s%s", fdir, fname);
-	u32 LEN = 0, num_blocks = 0, shift = 0;
-	switch (type) {
-	case 1:
-		shift = 4; // 16 bytes
-		break;
-	case 2:
-		shift = 5; // 32 bytes
-		break;
-	case 3:
-		shift = 8; // 256 bytes
-		break;
-	default:
-		return;
-	}
-	LEN = 1 << shift;
-	int num_blocks_ftp = 1 << (size - 9);
-	num_blocks = 1 << (size - shift);
-	
-	// if our save is small enough to fit in memory, use secure mode (i.e. read full file before erasing anything
-	bool insecure = ((1 << size) > size_buf);
-	if (insecure) {
-#if 0
-		displayMessageF("Save larger than available RAM.\nRestoring will be dangerous!\n\nPress Start + Select to proceed");
-		while (!(keysCurrent() & (KEY_START | KEY_SELECT)));
-#else
-		// TODO: translate this message!
-		displayMessage2F(STR_STR, "Save larger than available RAM.\nRestoring is buggy, so\nI will stop here.\n(Try Rudolphs tools.)");
-		while (1);
-#endif
-	}
-	if ((type == 3) && (insecure)) {
-		displayMessage2F(STR_HW_FORMAT_GAME);
-		auxspi_erase(ir);
-	}
+	u8 data_log2 = log2trunc(size_buf);
+	int num_read_blocks = (size > data_log2) ? (1 << (size - data_log2)) : 1;
+	int len_block = min(data_log2, size);
 	FtpAccess(fname, FTPLIB_FILE_READ, FTPLIB_IMAGE, buf, &ndata);
-	u8 *pdata = data;
-	for (int i = 0; i < num_blocks_ftp; i++) {
-		displayProgressBar(i+1, num_blocks_ftp);
-		int in = 0;
-		while (in < 512) {
-			in += FtpRead((u8*)&pdata[in], 512-in, ndata);
-			if (in < 512)
-				displayStateF(STR_HW_FTP_SLOW);
-			else
-				displayStateF(STR_EMPTY);
-		}
-		// does not fit into memory: unsafe mode
-		// TODO: reactivate this!
-		if (insecure) {
-			displayStateF(STR_STR, "Writing save (insecure!)");
-			for (int j = 0; j < 1 << (9-shift); j++) {
-				auxspi_write_data((i << 9)+(j << shift), ((u8*)pdata)+(j<<shift), LEN, type, ir);
-			}
-		}
-		pdata += 512;
-	}
-	// Write to game (safe mode)
-	if (!insecure) {
-		if (type == 3) {
-			displayMessage2F(STR_HW_FORMAT_GAME);
-			auxspi_erase(ir);
-		}
-		for (int i = 0; i < (1 << (size - shift)); i++) {
-			displayMessage2F(STR_HW_WRITE_GAME);
-			displayProgressBar(i+1, 1 << (size - shift));
-			auxspi_write_data(i << shift, ((u8*)data)+(i<<shift), LEN, type, ir);
-		}
+	// read save in multiple blocks, if required
+	for (int i = 0; i < num_read_blocks; i++) {
+		char ctr[32];
+		sprintf(ctr, "%i/%i", i+1, num_read_blocks);
+		displayMessage2F(STR_HW_READ_FILE, fname);
+		displayMessageF(STR_STR, ctr);
+		hwRestoreFTPPartial(i << len_block, len_block, type, ndata, ir);
 	}
 	FtpClose(ndata);
-	FtpQuit(ndata);
+	FtpQuit(buf);
 
 	Wifi_DisconnectAP();
 
@@ -896,6 +897,9 @@ void hwRestoreFTP(bool dlp)
 		displayMessage2F(STR_HW_PLEASE_REBOOT);
 		while(1);
 	}
+	
+	displayProgressBar(0,0);
+	displayMessageF(STR_EMPTY);
 }
 
 // ------------------------------------------------------------

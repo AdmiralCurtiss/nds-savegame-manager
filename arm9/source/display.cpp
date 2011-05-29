@@ -74,6 +74,7 @@ void displayPrintUpper()
 	consoleSetWindow(&upperScreen, 0, 0, 32, 24);
 	consoleClear();
 	iprintf("Mode     :\n");
+	iprintf("Memory   :\n");
 	iprintf("--- SLOT 1 ---------------------");
 	iprintf("Game ID  :\n");
 	iprintf("Game name:\n");
@@ -90,9 +91,9 @@ void displayPrintUpper()
 	}
 	
 	// print upper screen
-	consoleSetWindow(&upperScreen, 10, 2, 22, 4);
+	consoleSetWindow(&upperScreen, 10, 3, 22, 4);
 	consoleClear();
-	consoleSetWindow(&upperScreen, 10, 7, 22, 4);
+	consoleSetWindow(&upperScreen, 10, 8, 22, 4);
 	consoleClear();
 	
 	// fetch cartridge header (maybe, calling "cardReadHeader" on a FC messes with libfat!)
@@ -128,9 +129,12 @@ void displayPrintUpper()
 	}
 	consoleClear();
 	iprintf("%s", name);
+	// 0.5) memory buffer size
+	consoleSetWindow(&upperScreen, 10, 1, 20, 1);
+	iprintf("%i kB", size_buf >> 10);
 	
 	// 1) The cart id.
-	consoleSetWindow(&upperScreen, 10, 2, 22, 1);
+	consoleSetWindow(&upperScreen, 10, 3, 22, 1);
 	sprintf(&name[0], "----");
 	if (slot_1_type == 2) {
 		sprintf(&name[0], "Flash Card");
@@ -142,7 +146,7 @@ void displayPrintUpper()
 	iprintf("%s", name);
 
 	// 2) The cart name.
-	consoleSetWindow(&upperScreen, 10, 3, 22, 1);
+	consoleSetWindow(&upperScreen, 10, 4, 22, 1);
 	sprintf(&name[0], "----");
 	if (slot_1_type == 2) {
 		sprintf(&name[0], "Flash Card");
@@ -154,7 +158,7 @@ void displayPrintUpper()
 	iprintf("%s", name);
 
 	// 3) The save type
-	consoleSetWindow(&upperScreen, 10, 4, 22, 1);
+	consoleSetWindow(&upperScreen, 10, 5, 22, 1);
 	sprintf(&name[0], "----");
 	if (slot_1_type == 2) {
 		sprintf(&name[0], "Flash Card");
@@ -183,7 +187,7 @@ void displayPrintUpper()
 	iprintf("%s", name);
 
 	// 4) Special properties (infrared device...)
-	consoleSetWindow(&upperScreen, 10, 5, 22, 1);
+	consoleSetWindow(&upperScreen, 10, 6, 22, 1);
 	consoleClear();
 	memset(&name[0], 0, MAXPATHLEN);
 	if (slot_1_type == 1) {
@@ -195,7 +199,7 @@ void displayPrintUpper()
 	
 	// Slot 2 status
 	// 5) GBA game id
-	consoleSetWindow(&upperScreen, 10, 7, 22, 1);
+	consoleSetWindow(&upperScreen, 10, 8, 22, 1);
 	consoleClear();
 	memset(&name[0], 0, MAXPATHLEN);
 	if (ezflash) {
@@ -217,7 +221,7 @@ void displayPrintUpper()
 		iprintf("%s", name);
 
 	// 6) GBA game name
-	consoleSetWindow(&upperScreen, 10, 8, 22, 1);
+	consoleSetWindow(&upperScreen, 10, 9, 22, 1);
 	consoleClear();
 	memset(&name[0], 0, MAXPATHLEN);
 	if (ezflash)
@@ -232,7 +236,7 @@ void displayPrintUpper()
 		iprintf(name);
 
 	// 7) GBA save size
-	consoleSetWindow(&upperScreen, 10, 9, 22, 1);
+	consoleSetWindow(&upperScreen, 10, 10, 22, 1);
 	consoleClear();
 	memset(&name[0], 0, MAXPATHLEN);
 	if (ezflash)
@@ -264,7 +268,7 @@ void displayPrintUpper()
 		iprintf(name);
 
 	// 8) GBA special stuff
-	consoleSetWindow(&upperScreen, 10, 10, 22, 1);
+	consoleSetWindow(&upperScreen, 10, 11, 22, 1);
 	consoleClear();
 	memset(&name[0], 0, MAXPATHLEN);
 	if (ezflash)

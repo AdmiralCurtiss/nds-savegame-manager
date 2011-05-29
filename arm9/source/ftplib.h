@@ -132,6 +132,11 @@ GLOBALREF int FtpAccessBuf(const char *path, int typ, int mode, netbuf *nControl
     netbuf **nData);
 GLOBALREF int FtpDirBuf(char *buf, int size, const char *path, netbuf *nControl);
 
+// added by Pokedoc
+GLOBALREF int FtpAccessPos(const char *path, int typ, int pos, int mode, netbuf *nControl,
+    netbuf **nData);
+GLOBALREF int FtpCloseAccess(netbuf *nControl, netbuf *nData);
+
 #ifdef __cplusplus
 };
 #endif

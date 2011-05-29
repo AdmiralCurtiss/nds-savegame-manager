@@ -294,16 +294,33 @@ void auxspi_erase(bool ir)
 	}
 }
 
-/*
-void auxspi_wait_wip()
+void auxspi_erase_sector(u32 sector, bool ir)
 {
-	auxspi_disable_infrared();
-	auxspi_open(0);
-	auxspi_write(0x05);
-	uint8 sr;
-	do {
-		sr = auxspi_read();
-	} while (sr & 0x01);
-	auxspi_close();
+	uint8 type = auxspi_save_type(ir);
+	if (type == 3) {
+		if (ir)
+			auxspi_disable_infrared();
+		auxspi_open(0);
+		// set WEL (Write Enable Latch)
+		auxspi_write(0x06);
+		auxspi_close_lite();
+		
+		if (ir)
+			auxspi_disable_infrared();
+		auxspi_open(0);
+		auxspi_write(0xd8);
+		auxspi_write(sector & 0xff);
+		auxspi_write((sector >> 8) & 0xff);
+		auxspi_write((sector >> 8) & 0xff);
+		auxspi_close_lite();
+		
+		// wait for programming to finish
+		if (ir)
+			auxspi_disable_infrared();
+		auxspi_open(0);
+		auxspi_write(5);
+		do { REG_AUXSPIDATA = 0; auxspi_wait_busy(); } while (REG_AUXSPIDATA & 0x01);	// WIP (Write In Progress) ?
+		auxspi_wait_busy();
+		auxspi_close();
+	}
 }
-*/
