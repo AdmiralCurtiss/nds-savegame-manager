@@ -80,9 +80,9 @@ bool swap_cart()
 		while (!swap) {
 			if (keysCurrent() & KEY_A) {
 				// identify hardware
-				slot_1_type = get_slot1_type();
+				slot_1_type = auxspi_has_extra();
 				// don't try to dump a flash card
-				if (slot_1_type == 2)
+				if (slot_1_type == AUXSPI_FLASH_CARD)
 					continue;
 
 				sysSetBusOwners(true, true);
@@ -100,37 +100,6 @@ bool swap_cart()
 	}
 	
 	return true;
-}
-
-u32 get_slot1_type()
-{
-	sysSetBusOwners(true, true);
-
-	// Trying to read the save size in IR mode will fail on non-IR devices.
-	// If we have success, it is an IR device.
-	u8 size2 = auxspi_save_size_log_2(true);
-	if (size2 > 0)
-		return 1;
-	
-	// It is not an IR game, so maybe it is a regular game.
-	u8 size1 = auxspi_save_size_log_2(false);
-	if (size1 > 0)
-		return 0;
-	
-	// No save size test returned a save chip, so it must be a flash card,
-	//  or a type 3 save with an unknown JEDEC ID. Unfortunately, due to
-	//  different behaviour of flash cards, we can't test for this case,
-	//  or the flash card may be recognised as "type 3 game".
-	/*
-	u32 id2 = auxspi_save_jedec_id(true);
-	u32 id1 = auxspi_save_jedec_id(false);
-	if (id2 != 0x00ffffff)
-		return 1;
-	if (id1 != 0x00ffffff)
-		return 0;
-		*/
-	
-	return 2;
 }
 
 bool swap_card_game(uint32 size)
@@ -195,8 +164,8 @@ bool hwDetectSlot2DLDI()
 // This function is called on boot; it detects the hardware configuration and selects the mode.
 u32 hwDetect()
 {
-	// Identify Slot 1 devide. This is used by pretty much everything.
-	slot_1_type = get_slot1_type();
+	// Identify Slot 1 device. This is used by pretty much everything.
+	slot_1_type = auxspi_has_extra();
 
 	// First, look for a DSi running in DSi mode.
 	if (isDsi()) {
@@ -294,10 +263,9 @@ void hwBackup3in1()
 	swap_cart();
 	displayPrintUpper();
 
-	bool ir = (slot_1_type == 1) ? true : false;
-	uint8 size = auxspi_save_size_log_2(ir);
+	uint8 size = auxspi_save_size_log_2(slot_1_type);
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
-	uint8 type = auxspi_save_type(ir);
+	uint8 type = auxspi_save_type(slot_1_type);
 
 	displayMessage2F(STR_HW_3IN1_FORMAT_NOR);
 	hwFormatNor(0, size_blocks+1);
@@ -314,7 +282,7 @@ void hwBackup3in1()
 	
 	for (int i = 0; i < size_blocks; i++) {
 		displayProgressBar(i+1, size_blocks);
-		auxspi_read_data(i << 15, data, LEN, type, ir);
+		auxspi_read_data(i << 15, data, LEN, type, slot_1_type);
 		uint32 ime = hwGrab3in1();
 		SetSerialMode();
 		WriteNorFlash((i << 15) + pitch, data, LEN);
@@ -462,25 +430,22 @@ void hwRestore3in1()
 
 void hwRestore3in1_b(uint32 size_file)
 {
-	bool ir = (slot_1_type == 1) ? true : false;
-
 	// Third, swap in a new game
-	uint32 size = auxspi_save_size_log_2(ir);
+	uint32 size = auxspi_save_size_log_2(slot_1_type);
 	while ((size_file < size) || (slot_1_type == 2)) {
 		if (slot_1_type == 2)
 			displayMessage2F(STR_HW_SWAP_CARD);
 		else if (size_file < size)
 			displayMessage2F(STR_HW_WRONG_GAME);
 		swap_cart();
-		ir = (slot_1_type == 1) ? true : false;
-		size = auxspi_save_size_log_2(ir);
+		size = auxspi_save_size_log_2(slot_1_type);
 	}
 	displayPrintUpper();
 	
-	uint8 type = auxspi_save_type(ir);
+	uint8 type = auxspi_save_type(slot_1_type);
 	if (type == 3) {
 		displayMessage2F(STR_HW_FORMAT_GAME);
-		auxspi_erase(ir);
+		auxspi_erase(slot_1_type);
 	}
 
 	// And finally, write the save!
@@ -508,7 +473,7 @@ void hwRestore3in1_b(uint32 size_file)
 		uint32 ime = hwGrab3in1();
 		ReadNorFlash(data, (i << shift) + pitch, LEN);
 		hwRelease3in1(ime);
-		auxspi_write_data(i << shift, data, LEN, type, ir);
+		auxspi_write_data(i << shift, data, LEN, type, slot_1_type);
 	}
 	displayProgressBar(1, 1);
 
@@ -519,10 +484,9 @@ void hwRestore3in1_b(uint32 size_file)
 // ------------------------------------------------------------
 void hwErase()
 {
-	bool ir = (slot_1_type == 1) ? true : false;
 	displayMessage2F(STR_HW_WARN_DELETE);
 	while (!(keysCurrent() & (KEY_UP | KEY_R | KEY_Y))) {};
-	auxspi_erase(ir);
+	auxspi_erase(slot_1_type);
 }
 
 // --------------------------------------------------------
@@ -533,9 +497,8 @@ void hwBackupSlot2()
 	swap_cart();
 	displayPrintUpper();
 
-	bool ir = (slot_1_type == 1) ? true : false;
-	uint32 size = auxspi_save_size_log_2(ir);
-	uint8 type = auxspi_save_type(ir);
+	uint32 size = auxspi_save_size_log_2(slot_1_type);
+	uint8 type = auxspi_save_type(slot_1_type);
 
 	// just select a filename, no extra work required!
 	char path[256];
@@ -572,7 +535,7 @@ void hwBackupSlot2()
 	u32 LEN = min(1 << size, 0x100);
 	for (u32 i = 0; i < size_blocks; i++) {
 		displayProgressBar(i+1, size_blocks);
-		auxspi_read_data(i << 8, data, LEN, type, ir);
+		auxspi_read_data(i << 8, data, LEN, type, slot_1_type);
 		fwrite(data, 1, LEN, file);
 	}
 	fclose(file);
@@ -585,9 +548,8 @@ void hwRestoreSlot2()
 {
 	// First, swap in a new game
 	swap_cart();
-	bool ir = (slot_1_type == 1) ? true : false;
-	uint32 size = auxspi_save_size_log_2(ir);
-	uint8 type = auxspi_save_type(ir);
+	uint32 size = auxspi_save_size_log_2(slot_1_type);
+	uint8 type = auxspi_save_type(slot_1_type);
 	displayPrintUpper();
 
 	// second, select a save file
@@ -610,7 +572,7 @@ void hwRestoreSlot2()
 	// 2a, format game if required
 	if (type == 3) {
 		displayMessage2F(STR_HW_FORMAT_GAME);
-		auxspi_erase(ir);
+		auxspi_erase(slot_1_type);
 	}
 	
 	// and third, write save
@@ -637,7 +599,7 @@ void hwRestoreSlot2()
 			displayProgressBar(i+1, num_blocks);
 		fread(data, 1, LEN, file);
 		sysSetBusOwners(true, true);
-		auxspi_write_data(i << shift, data, LEN, type, ir);
+		auxspi_write_data(i << shift, data, LEN, type, slot_1_type);
 	}
 	fclose(file);
 	
@@ -656,11 +618,10 @@ void hwBackupFTP(bool dlp)
 	// First: swap card
 	if (!dlp)
 		swap_cart();
-	bool ir = (slot_1_type == 1) ? true : false;
 	displayPrintUpper();
-	uint8 size = auxspi_save_size_log_2(ir);
+	uint8 size = auxspi_save_size_log_2(slot_1_type);
 	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
-	uint8 type = auxspi_save_type(ir);
+	uint8 type = auxspi_save_type(slot_1_type);
 	if (size < 15)
 		size_blocks = 1;
 	else
@@ -735,7 +696,7 @@ void hwBackupFTP(bool dlp)
 	int num_ftp_blocks = 1 << (size - 9);
 	for (int i = 0; i < num_ftp_blocks; i++) {
 		displayProgressBar(i+1, num_ftp_blocks);
-		auxspi_read_data(i << 9, (u8*)&data[0], length, type, ir);
+		auxspi_read_data(i << 9, (u8*)&data[0], length, type, slot_1_type);
 		u32 out = 0;
 		while (out < length) {
 			u32 delta = FtpWrite((u8*)&data[out], length-out, ndata);
@@ -767,7 +728,7 @@ void hwBackupFTP(bool dlp)
 }
 
 // an internal function used to read big files from the FTP server
-bool hwRestoreFTPPartial(u32 ofs, u32 size, u32 type, netbuf *ndata, bool ir)
+bool hwRestoreFTPPartial(u32 ofs, u32 size, u32 type, netbuf *ndata)
 {
 	int num_blocks_ftp = 1 << (size - 9);
 	u8 *pdata = data;
@@ -808,14 +769,14 @@ bool hwRestoreFTPPartial(u32 ofs, u32 size, u32 type, netbuf *ndata, bool ir)
 		u32 num = max(u32(0), size-16);
 		for (int i = 0; i < (1 << num); i++) {
 			displayProgressBar(i+1, 1 << num);
-			auxspi_erase_sector(sector+i, ir);
+			auxspi_erase_sector(sector+i, slot_1_type);
 		}
 		displayProgressBar(0,0);
 	}
 	displayMessage2F(STR_HW_WRITE_GAME);
 	for (int i = 0; i < (1 << (size - shift)); i++) {
 		displayProgressBar(i+1, 1 << (size - shift));
-		auxspi_write_data(ofs + (i << shift), ((u8*)data)+(i<<shift), LEN, type, ir);
+		auxspi_write_data(ofs + (i << shift), ((u8*)data)+(i<<shift), LEN, type, slot_1_type);
 	}
 	
 	return true;
@@ -871,9 +832,8 @@ void hwRestoreFTP(bool dlp)
 	if (!dlp)
 		swap_cart();
 	displayPrintUpper();
-	bool ir = (slot_1_type == 1) ? true : false;
-	uint8 size = auxspi_save_size_log_2(ir);
-	uint8 type = auxspi_save_type(ir);
+	uint8 size = auxspi_save_size_log_2(slot_1_type);
+	uint8 type = auxspi_save_type(slot_1_type);
 
 	// Fourth: read file
 	u8 data_log2 = log2trunc(size_buf);
@@ -886,7 +846,7 @@ void hwRestoreFTP(bool dlp)
 		sprintf(ctr, "%i/%i", i+1, num_read_blocks);
 		displayMessage2F(STR_HW_READ_FILE, fname);
 		displayMessageF(STR_STR, ctr);
-		hwRestoreFTPPartial(i << len_block, len_block, type, ndata, ir);
+		hwRestoreFTPPartial(i << len_block, len_block, type, ndata);
 	}
 	FtpClose(ndata);
 	FtpQuit(buf);

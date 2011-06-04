@@ -68,7 +68,7 @@ uint8 jedec_table(uint32 id)
 	};
 }
 
-uint8 type2_size(bool ir = false)
+uint8 type2_size(auxspi_extra extra)
 {
 	static const uint32 offset0 = (8*1024-1);        //      8KB
 	static const uint32 offset1 = (2*8*1024-1);      //      16KB
@@ -76,12 +76,12 @@ uint8 type2_size(bool ir = false)
 	u8 buf2;     //      +8k data        read -> read
 	u8 buf3;     //      +0k ~data          write
 	u8 buf4;     //      +8k data new    comp buf2
-	auxspi_read_data(offset0, &buf1, 1, 2, ir);
-	auxspi_read_data(offset1, &buf2, 1, 2, ir);
+	auxspi_read_data(offset0, &buf1, 1, 2, extra);
+	auxspi_read_data(offset1, &buf2, 1, 2, extra);
 	buf3=~buf1;
-	auxspi_write_data(offset0, &buf3, 1, 2, ir);
-	auxspi_read_data (offset1, &buf4, 1, 2, ir);
-	auxspi_write_data(offset0, &buf1, 1, 2, ir);
+	auxspi_write_data(offset0, &buf3, 1, 2, extra);
+	auxspi_read_data (offset1, &buf4, 1, 2, extra);
+	auxspi_write_data(offset0, &buf1, 1, 2, extra);
 	if(buf4!=buf2)      //      +8k
 		return 0x0d;  //       8KB(64kbit)
 	else
@@ -90,47 +90,46 @@ uint8 type2_size(bool ir = false)
 
 // ========================================================
 
-uint8 auxspi_save_type(bool ir)
+uint8 auxspi_save_type(auxspi_extra extra)
 {
-	uint32 jedec = auxspi_save_jedec_id(ir); // 9f
-	int8 sr = auxspi_save_status_register(ir); // 05
+	uint32 jedec = auxspi_save_jedec_id(extra); // 9f
+	int8 sr = auxspi_save_status_register(extra); // 05
 	
 	if ((sr & 0xfd) == 0xF0 && (jedec == 0x00ffffff)) return 1;
 	if ((sr & 0xfd) == 0x00 && (jedec == 0x00ffffff)) return 2;
 	if ((sr & 0xfd) == 0x00 && (jedec != 0x00ffffff)) return 3;
-	// TODO: add support for Band Brothers DX (as soon as I know how)
 	
 	return 0;
 }
 
-uint32 auxspi_save_size(bool ir)
+uint32 auxspi_save_size(auxspi_extra extra)
 {
-	return 1 << auxspi_save_size_log_2(ir);
+	return 1 << auxspi_save_size_log_2(extra);
 }
 
-uint8 auxspi_save_size_log_2(bool ir)
+uint8 auxspi_save_size_log_2(auxspi_extra extra)
 {
-	uint8 type = auxspi_save_type(ir); // TESTME: "ir" was missing, should fix recent issues
+	uint8 type = auxspi_save_type(extra);
 	switch (type) {
 	case 1:
 		return 0x09; // 512 bytes
 		break;
 	case 2:
-		return type2_size(ir);
+		return type2_size(extra);
 		break;
 	case 3:
-		return jedec_table(auxspi_save_jedec_id(ir));
+		return jedec_table(auxspi_save_jedec_id(extra));
 		break;
 	default:
 		return 0;
 	}
 }
 
-uint32 auxspi_save_jedec_id(bool ir)
+uint32 auxspi_save_jedec_id(auxspi_extra extra)
 {
 	uint32 id = 0;
-	if (ir)
-		auxspi_disable_infrared();
+	if (extra)
+		auxspi_disable_extra(extra);
 	auxspi_open(0);
 	auxspi_write(0x9f);
 	id |= auxspi_read() << 16;
@@ -141,11 +140,11 @@ uint32 auxspi_save_jedec_id(bool ir)
 	return id;
 }
 
-uint8 auxspi_save_status_register(bool ir)
+uint8 auxspi_save_status_register(auxspi_extra extra)
 {
 	uint8 sr = 0;
-	if (ir)
-		auxspi_disable_infrared();
+	if (extra)
+		auxspi_disable_extra(extra);
 	auxspi_open(0);
 	auxspi_write(0x05);
 	sr = auxspi_read();
@@ -153,15 +152,15 @@ uint8 auxspi_save_status_register(bool ir)
 	return sr;
 }
 
-void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type, bool ir)
+void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type, auxspi_extra extra)
 {
 	if (type == 0)
-		type = auxspi_save_type(ir);
+		type = auxspi_save_type(extra);
 	if (type == 0)
 		return;
 
-	if (ir)
-		auxspi_disable_infrared();
+	if (extra)
+		auxspi_disable_extra(extra);
 	auxspi_open(0);
 	auxspi_write(0x03 | ((type == 1) ? addr>>8<<3 : 0));
 
@@ -183,7 +182,7 @@ void auxspi_read_data(uint32 addr, uint8* buf, uint16 cnt, uint8 type, bool ir)
 	auxspi_close();
 }
 
-void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type, bool ir)
+void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type, auxspi_extra extra)
 {
 	if (type == 0)
 		type = auxspi_save_type();
@@ -200,15 +199,15 @@ void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type, bool ir)
 	// we can only write a finite amount of data at once, so we need a separate loop
 	//  for multiple passes.
 	while (addr < addr_end) {
-		if (ir)
-			auxspi_disable_infrared();
+		if (extra)
+			auxspi_disable_extra(extra);
 		auxspi_open(0);
 		// set WEL (Write Enable Latch)
 		auxspi_write(0x06);
 		auxspi_close_lite();
 		
-		if (ir)
-			auxspi_disable_infrared();
+		if (extra)
+			auxspi_disable_extra(extra);
 		auxspi_open(0);
 		// send initial "write" command
         if(type == 1) {
@@ -233,13 +232,31 @@ void auxspi_write_data(uint32 addr, uint8 *buf, uint16 cnt, uint8 type, bool ir)
 		auxspi_close_lite();
 
 		// wait programming to finish
-		if (ir)
-			auxspi_disable_infrared();
+		if (extra)
+			auxspi_disable_extra(extra);
 		auxspi_open(0);
 		auxspi_write(5);
-		do { REG_AUXSPIDATA = 0; auxspi_wait_busy(); } while (REG_AUXSPIDATA & 0x01);	// WIP (Write In Progress) ?
+		auxspi_wait_wip();
         auxspi_wait_busy();
 		auxspi_close();
+	}
+}
+
+void auxspi_disable_extra(auxspi_extra extra)
+{
+	switch (extra) {
+		case AUXSPI_INFRARED:
+			auxspi_disable_infrared_core();
+			break;
+		case AUXSPI_BBDX:
+			// TODO:
+			auxspi_disable_big_protection();
+			break;
+		case AUXSPI_BLUETOOTH:
+			// TODO
+			//auxspi_disable_bluetooth();
+			break;
+		default:;
 	}
 }
 
@@ -248,27 +265,106 @@ void auxspi_disable_infrared()
 	auxspi_disable_infrared_core();
 }
 
-bool auxspi_has_infrared()
+void auxspi_disable_big_protection()
 {
-	return (slot_1_type == 1);
+	static bool doonce = false;
+	if (doonce)
+		return;
+	doonce = true;
+	sysSetBusOwners(true, true);
+	
+	auxspi_open(3);
+	auxspi_write(0xf1);
+	auxspi_wait_busy();
+	auxspi_close_lite();
+
+	auxspi_open(3);
+	auxspi_write(0x6);
+	auxspi_wait_busy();
+	auxspi_close_lite();
+	
+	auxspi_open(3);
+	auxspi_write(0xfa);
+	auxspi_wait_busy();
+	auxspi_write(0x1);
+	auxspi_wait_busy();
+	auxspi_write(0x31);
+	auxspi_wait_busy();
+	auxspi_close();
+	// --
+	
+	auxspi_open(3);
+	auxspi_write(0x14);
+	auxspi_wait_busy();
+	auxspi_close_lite();
+
+	auxspi_open(3);
+	auxspi_write(0x6);
+	auxspi_wait_busy();
+	auxspi_close_lite();
+	
+	auxspi_open(3);
+	auxspi_write(0xf8);
+	auxspi_wait_busy();
+	auxspi_write(0x1);
+	auxspi_wait_busy();
+	auxspi_write(0x0);
+	auxspi_wait_busy();
+	auxspi_close();
+	// --
+	
+	auxspi_open(3);
+	auxspi_write(0xe);
+	auxspi_wait_busy();
+	auxspi_close();
+	
 }
 
-void auxspi_erase(bool ir)
+auxspi_extra auxspi_has_extra()
 {
-	uint8 type = auxspi_save_type(ir);
+	sysSetBusOwners(true, true);
+
+	// Trying to read the save size in IR mode will fail on non-IR devices.
+	// If we have success, it is an IR device.
+	u8 size2 = auxspi_save_size_log_2(AUXSPI_INFRARED);
+	if (size2 > 0)
+		return AUXSPI_INFRARED;
+	
+	// It is not an IR game, so maybe it is a regular game.
+	u8 size1 = auxspi_save_size_log_2();
+	if (size1 > 0)
+		return AUXSPI_DEFAULT;
+
+#if 0
+	// EXPERIMENTAL: verify that flash cards do not answer with the same signature!
+	// Look for BBDX (which always returns "ff" on every command)
+	uint32 jedec = auxspi_save_jedec_id(); // 9f
+	//int8 sr = auxspi_save_status_register(); // 05
+	if (jedec == 0x00ffffff)
+		return AUXSPI_BBDX;
+#endif
+	
+	// TODO: add support for Pokemon Typing DS (as soon as we figure out how)
+	
+	return AUXSPI_FLASH_CARD;
+}
+
+void auxspi_erase(auxspi_extra extra)
+{
+	uint8 type = auxspi_save_type(extra);
 	if (type == 3) {
 		uint8 size;
-		size = 1 << (auxspi_save_size_log_2(ir) - 16);
+		size = 1 << (auxspi_save_size_log_2(extra) - 16);
 		for (int i = 0; i < size; i++) {
-			if (ir)
-				auxspi_disable_infrared();
+			if (extra)
+				auxspi_disable_extra(extra);
 			auxspi_open(0);
 			// set WEL (Write Enable Latch)
 			auxspi_write(0x06);
 			auxspi_close_lite();
 			
-			if (ir)
-				auxspi_disable_infrared();
+			if (extra)
+				auxspi_disable_extra(extra);
 			auxspi_open(0);
 			auxspi_write(0xd8);
 			auxspi_write(i);
@@ -277,36 +373,36 @@ void auxspi_erase(bool ir)
 			auxspi_close_lite();
 			
 			// wait for programming to finish
-			if (ir)
-				auxspi_disable_infrared();
+			if (extra)
+				auxspi_disable_extra(extra);
 			auxspi_open(0);
 			auxspi_write(5);
-			do { REG_AUXSPIDATA = 0; auxspi_wait_busy(); } while (REG_AUXSPIDATA & 0x01);	// WIP (Write In Progress) ?
+			auxspi_wait_wip();
 			auxspi_wait_busy();
 			auxspi_close();
 		}
 	} else {
-		int8 size = 1 << max(0, (auxspi_save_size_log_2(ir) - 15));
+		int8 size = 1 << max(0, (auxspi_save_size_log_2(extra) - 15));
 		memset(data, 0, 0x8000);
 		for (int i = 0; i < size; i++) {
-			auxspi_write_data(i << 15, data, 0x8000, type, ir);
+			auxspi_write_data(i << 15, data, 0x8000, type, extra);
 		}
 	}
 }
 
-void auxspi_erase_sector(u32 sector, bool ir)
+void auxspi_erase_sector(u32 sector, auxspi_extra extra)
 {
-	uint8 type = auxspi_save_type(ir);
+	uint8 type = auxspi_save_type(extra);
 	if (type == 3) {
-		if (ir)
-			auxspi_disable_infrared();
+		if (extra)
+			auxspi_disable_extra(extra);
 		auxspi_open(0);
 		// set WEL (Write Enable Latch)
 		auxspi_write(0x06);
 		auxspi_close_lite();
 		
-		if (ir)
-			auxspi_disable_infrared();
+		if (extra)
+			auxspi_disable_extra(extra);
 		auxspi_open(0);
 		auxspi_write(0xd8);
 		auxspi_write(sector & 0xff);
@@ -315,11 +411,11 @@ void auxspi_erase_sector(u32 sector, bool ir)
 		auxspi_close_lite();
 		
 		// wait for programming to finish
-		if (ir)
-			auxspi_disable_infrared();
+		if (extra)
+			auxspi_disable_extra(extra);
 		auxspi_open(0);
 		auxspi_write(5);
-		do { REG_AUXSPIDATA = 0; auxspi_wait_busy(); } while (REG_AUXSPIDATA & 0x01);	// WIP (Write In Progress) ?
+		auxspi_wait_wip();
 		auxspi_wait_busy();
 		auxspi_close();
 	}

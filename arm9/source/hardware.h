@@ -47,7 +47,7 @@ void do_dump_nds_save_stage_2(int size);
 void do_restore_nds_save();
 
 bool swap_cart();
-u32 get_slot1_type();
+//u32 get_slot1_type();
 
 // This function was previously found in the main function.
 // Return values:

@@ -34,9 +34,14 @@ inline void auxspi_wait_busy()
 	while (REG_AUXSPICNT & 0x80);
 }
 
+inline void auxspi_wait_wip()
+{
+	do { REG_AUXSPIDATA = 0; auxspi_wait_busy(); } while (REG_AUXSPIDATA & 0x01);	// WIP (Write In Progress) ?
+}
+
 inline void auxspi_open(uint8 device)
 {
-	REG_AUXSPICNT = 0xa040 | (device & 3) | 3;
+	REG_AUXSPICNT = 0xa040 | (device & 3);
 	auxspi_wait_busy();
 }
 

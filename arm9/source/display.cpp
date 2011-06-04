@@ -67,7 +67,6 @@ void displayPrintUpper()
 {
 	bool gba = (mode == 1);
 	u32 dstype = (mode == 3) ? 1 : 0;
-	bool ir = (slot_1_type == 1) ? true : false;
 
 	// print upper screen (background)
 	consoleSelect(&upperScreen);
@@ -98,7 +97,7 @@ void displayPrintUpper()
 	
 	// fetch cartridge header (maybe, calling "cardReadHeader" on a FC messes with libfat!)
 	sNDSHeader nds;
-	if (slot_1_type != 2)
+	if (slot_1_type != AUXSPI_FLASH_CARD)
 		cardReadHeader((uint8*)&nds);
 	
 	char name[MAXPATHLEN];
@@ -136,7 +135,7 @@ void displayPrintUpper()
 	// 1) The cart id.
 	consoleSetWindow(&upperScreen, 10, 3, 22, 1);
 	sprintf(&name[0], "----");
-	if (slot_1_type == 2) {
+	if (slot_1_type == AUXSPI_FLASH_CARD) {
 		sprintf(&name[0], "Flash Card");
 	} else {
 		memcpy(&name[0], &nds.gameCode[0], 4);
@@ -148,7 +147,7 @@ void displayPrintUpper()
 	// 2) The cart name.
 	consoleSetWindow(&upperScreen, 10, 4, 22, 1);
 	sprintf(&name[0], "----");
-	if (slot_1_type == 2) {
+	if (slot_1_type == AUXSPI_FLASH_CARD) {
 		sprintf(&name[0], "Flash Card");
 	} else {
 		memcpy(&name[0], &nds.gameTitle[0], 12);
@@ -160,11 +159,11 @@ void displayPrintUpper()
 	// 3) The save type
 	consoleSetWindow(&upperScreen, 10, 5, 22, 1);
 	sprintf(&name[0], "----");
-	if (slot_1_type == 2) {
+	if (slot_1_type == AUXSPI_FLASH_CARD) {
 		sprintf(&name[0], "Flash Card");
 	} else {
-		uint8 type = auxspi_save_type(ir);
-		uint8 size = auxspi_save_size_log_2(ir);
+		uint8 type = auxspi_save_type(slot_1_type);
+		uint8 size = auxspi_save_size_log_2(slot_1_type);
 		switch (type) {
 		case 1:
 			sprintf(&name[0], "Eeprom (%i Bytes)", size);
@@ -174,7 +173,7 @@ void displayPrintUpper()
 			break;
 		case 3:
 			if (size == 0)
-				sprintf(&name[0], "Flash (ID:%x)", auxspi_save_jedec_id(ir));
+				sprintf(&name[0], "Flash (ID:%x)", auxspi_save_jedec_id(slot_1_type));
 			else
 				sprintf(&name[0], "Flash (%i kB)", 1 << (size - 10));
 			break;
@@ -190,10 +189,18 @@ void displayPrintUpper()
 	consoleSetWindow(&upperScreen, 10, 6, 22, 1);
 	consoleClear();
 	memset(&name[0], 0, MAXPATHLEN);
-	if (slot_1_type == 1) {
-		sprintf(&name[0], "Infrared");
-	} else {
-		sprintf(&name[0], "----");
+	switch (slot_1_type) {
+		case AUXSPI_INFRARED:
+			sprintf(&name[0], "Infrared");
+			break;
+		case AUXSPI_BBDX:
+			sprintf(name, "XXL");
+			break;
+		case AUXSPI_BLUETOOTH:
+			sprintf(name, "Bluetooth");
+			break;
+		default:
+			sprintf(&name[0], "----");
 	}
 	iprintf("%s", name);
 	

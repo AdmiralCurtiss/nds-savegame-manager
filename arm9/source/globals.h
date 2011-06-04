@@ -27,11 +27,12 @@
 #define GLOBALS_H
 
 #include <nds.h>
+#include "auxspi.h"
 
 extern u8 *data;
 extern u32 size_buf;
 
-extern u32 slot_1_type;
+extern auxspi_extra slot_1_type;
 
 extern char ftp_ip[16];
 extern char ftp_user[64];

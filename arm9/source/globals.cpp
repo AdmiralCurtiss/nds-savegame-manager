@@ -28,7 +28,7 @@
 u8 *data;
 u32 size_buf;
 
-u32 slot_1_type = ~0;
+auxspi_extra slot_1_type = AUXSPI_FLASH_CARD;
 
 char ftp_ip[16] = "ftp_ip";
 char ftp_user[64] = "ftp_user";
