@@ -26,6 +26,7 @@
 #ifndef SAVE_DISPLAY_H
 #define SAVE_DISPLAY_H
 
+#include <nds.h>
 #include <nds/arm9/console.h>
 #include <stdarg.h>
 
@@ -37,7 +38,9 @@ extern PrintConsole lowerScreen;
 void displayInit();
 void displayTitle();
 
-void displayPrintUpper();
+// Set "first" to true to tell the program that it has just booted, before anything was swapped.
+//  This is a workaround for the Cyclops iEvolution, and an attempt to prevent
+void displayPrintUpper(bool fc = false);
 void displayPrintLower();
 
 void displayMessageF(int id, ...);

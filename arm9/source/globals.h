@@ -29,6 +29,10 @@
 #include <nds.h>
 #include "auxspi.h"
 
+#define VERSION_MAJOR 0
+#define VERSION_MINOR 3
+#define VERSION_MICRO 0
+
 extern u8 *data;
 extern u32 size_buf;
 
@@ -38,6 +42,7 @@ extern char ftp_ip[16];
 extern char ftp_user[64];
 extern char ftp_pass[64];
 extern int ftp_port;
+extern bool ftp_active;
 
 extern int ir_delay;
 

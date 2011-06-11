@@ -119,7 +119,8 @@ bool hwDetectSlot2DLDI()
 
 	// CycloDS (Slot 2)
 	if (!strnicmp(io_dldi_data->friendlyName, "CycloDS", 7)
-		&& strnicmp(io_dldi_data->friendlyName, "CycloDS Evolution", 17))
+		&& strnicmp(io_dldi_data->friendlyName, "CycloDS Evolution", 17)
+		&& strnicmp(io_dldi_data->friendlyName, "CycloDS iEvolution", 18))
 		return true;
 
 	// Ewin2
@@ -219,8 +220,11 @@ u32 hwDetect()
 	//  it does not support hotswapping the game. So we select this mode if there is *no*
 	//  flash card inserted in Slot 1.
 	//
-	if (slot_1_type != 2)
+	// FIXME: This is currently broken due to the way the iEvolution works.
+	/*
+	if (slot_1_type != AUXSPI_FLASH_CARD)
 		return 5;
+		*/
 	
 	// Nothing unique found, so enter WiFi mode
 	return 0;
@@ -608,11 +612,43 @@ void hwRestoreSlot2()
 }
 
 // ------------------------------------------------------------
+void hwLoginFTP(netbuf **buf)
+{
+	int j;
+	static int jmax = 10;
+
+	displayMessage2F(STR_HW_FTP_SEEK_AP);
+	if (!Wifi_InitDefault(true)) {
+		displayWarning2F(STR_HW_FTP_ERR_AP);
+		while(1);
+	}
+	displayMessage2F(STR_HW_FTP_SEEK_FTP);
+	sprintf(txt, "%s:%i", ftp_ip, ftp_port);
+	j = 0;
+	while (!FtpConnect(txt, buf)) {
+		j++;
+		if (j >= jmax) {
+			displayWarning2F(STR_HW_FTP_ERR_FTP);
+			while(1);
+		}
+		swiDelay(10000);
+	}
+	displayMessage2F(STR_HW_FTP_LOGIN);
+	j = 0;
+	while (!FtpLogin(ftp_user, ftp_pass, *buf)) {
+		j++;
+		if (j >= jmax) {
+			displayWarning2F(STR_HW_FTP_ERR_LOGIN);
+			while(1);
+		}
+		swiDelay(10000);
+	}
+	ftp_active = true;
+}
+
 void hwBackupFTP(bool dlp)
 {
 	netbuf *buf, *ndata;
-	int j;
-	static int jmax = 10;
 
 	// Dump save and write it to FTP server
 	// First: swap card
@@ -628,32 +664,8 @@ void hwBackupFTP(bool dlp)
 		size_blocks = 1 << (uint8(size) - 15);
 
 	// Second: connect to FTP server
-	displayMessage2F(STR_HW_FTP_SEEK_AP);
-	if (!Wifi_InitDefault(true)) {
-		displayWarning2F(STR_HW_FTP_ERR_AP);
-		while(1);
-	}
-	displayMessage2F(STR_HW_FTP_SEEK_FTP);
-	sprintf(txt, "%s:%i", ftp_ip, ftp_port);
-	j = 0;
-	while (!FtpConnect(txt, &buf)) {
-		j++;
-		if (j >= jmax) {
-			displayWarning2F(STR_HW_FTP_ERR_FTP);
-			while(1);
-		}
-		swiDelay(10000);
-	}
-	displayMessage2F(STR_HW_FTP_LOGIN);
-	j = 0;
-	while (!FtpLogin(ftp_user, ftp_pass, buf)) {
-		j++;
-		if (j >= jmax) {
-			displayWarning2F(STR_HW_FTP_ERR_LOGIN);
-			while(1);
-		}
-		swiDelay(10000);
-	}
+	if (!ftp_active)
+		hwLoginFTP(&buf);
 	
 	char fdir[256] = "";
 	char fname[256] ="";
@@ -785,38 +797,11 @@ bool hwRestoreFTPPartial(u32 ofs, u32 size, u32 type, netbuf *ndata)
 void hwRestoreFTP(bool dlp)
 {
 	netbuf *buf, *ndata;
-	int j;
-	static int jmax = 10;
 
 	// Dump save and write it to FTP server
 	// First: connect to FTP server
-	displayMessage2F(STR_HW_FTP_SEEK_AP);
-	if (!Wifi_InitDefault(true)) {
-		displayWarning2F(STR_HW_FTP_ERR_AP);
-		while(1);
-	}
-	displayMessage2F(STR_HW_FTP_SEEK_FTP);
-	char fullname[512];
-	sprintf(fullname, "%s:%i", ftp_ip, ftp_port);
-	j = 0;
-	while (!FtpConnect(fullname, &buf)) {
-		j++;
-		if (j >= jmax) {
-			displayWarning2F(STR_HW_FTP_ERR_FTP);
-			while(1);
-		}
-		swiDelay(10000);
-	}
-	displayMessage2F(STR_HW_FTP_LOGIN);
-	j = 0;
-	while (!FtpLogin(ftp_user, ftp_pass, buf)) {
-		j++;
-		if (j >= jmax) {
-			displayWarning2F(STR_HW_FTP_ERR_LOGIN);
-			while(1);
-		}
-		swiDelay(10000);
-	}
+	if (ftp_active)
+		hwLoginFTP(&buf);
 
 	// Second: select a filename
 	char fdir[256] = "";

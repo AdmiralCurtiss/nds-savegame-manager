@@ -37,7 +37,14 @@ Version 0.2.4 (4-10-2011)
 - Program now makes use of lower screen for most messages, which allows longer, more detailled messages.
 - Adds a Readme file/Manual to the program.
 
-Version 0.2.5 (5-??-2011)
+Version 0.3 (6-10-2011)
+
+This is the first non-beta release.
 
 - Adds the ability to translate most parts of the user interface.
+- Adds Slot 2 backup mode (you will need a Slot 2 flash card; anything that has a DLDI driver should be supported).
+- Enables FTP restore mode for saves bigger than the memory buffer (usually 2 MB).
+- Fixes FTP mode so that multiple transactions are possible without restarting.
 - Various stability fixes.
+- Many behind-the scenes improvements aimed to simplify further hacking.
+- Instruction file is no longer beta.

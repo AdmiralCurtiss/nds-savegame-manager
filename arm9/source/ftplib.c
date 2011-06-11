@@ -74,7 +74,7 @@
 #define FTPLIB_DEFMODE FTPLIB_PASSIVE
 #endif
 
-#include "display.h"
+//#include "display.h"
 //#define perror iprintf
 #define perror //
 
@@ -424,7 +424,7 @@ GLOBALDEF int FtpConnect(const char *host, netbuf **nControl)
 	    sin.sin_port = pse->s_port;
 	}
 	*/
-	u32 v[5];
+	int v[5];
 	sscanf(host,"%u.%u.%u.%u:%u",&v[1],&v[2],&v[3],&v[4],&v[0]);
 	sin.sin_port = htons(v[0]);
 	sin.sin_addr.s_addr = (v[1] << 0) + (v[2] << 8) + (v[3] << 16) + (v[4] << 24);

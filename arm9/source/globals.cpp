@@ -34,6 +34,7 @@ char ftp_ip[16] = "ftp_ip";
 char ftp_user[64] = "ftp_user";
 char ftp_pass[64] = "ftp_pass";
 int ftp_port = 0;
+bool ftp_active = false;
 
 int ir_delay = 1200;
 

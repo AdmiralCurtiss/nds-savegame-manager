@@ -57,13 +57,13 @@ void displayInit()
 
 void displayTitle()
 {
-	displayMessageF(STR_TITLE_MSG);
+	displayMessageF(STR_TITLE_MSG, VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
 	
 	displayStateF(STR_STR, "Press (B) to continue");
 	while (!(keysCurrent() & KEY_B));
 }
 
-void displayPrintUpper()
+void displayPrintUpper(bool fc)
 {
 	bool gba = (mode == 1);
 	u32 dstype = (mode == 3) ? 1 : 0;
@@ -97,8 +97,13 @@ void displayPrintUpper()
 	
 	// fetch cartridge header (maybe, calling "cardReadHeader" on a FC messes with libfat!)
 	sNDSHeader nds;
-	if (slot_1_type != AUXSPI_FLASH_CARD)
+	// The CycloDS iEvolution detects asd a game, probably to cheat Nintendos firmware.
+	//  I might be able to fix this, to add autodetection, but I have decided against this,
+	//  since the same method would also offer Nintendo a way to lock out this card!
+	if (!fc && (slot_1_type != AUXSPI_FLASH_CARD))
 		cardReadHeader((uint8*)&nds);
+	else
+		slot_1_type = AUXSPI_FLASH_CARD;
 	
 	char name[MAXPATHLEN];
 	// 0) print the mode

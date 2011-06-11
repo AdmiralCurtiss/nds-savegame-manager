@@ -62,7 +62,7 @@ bool stringsLoadFile(const char *fname)
 	ADD_STRING(STR_STR, "%s");
 	//
 	ADD_STRING(STR_MM_WIPE,"\n    WIPES OUT ALL SAVE DATA\n         ON YOUR GAME !");
-	ADD_STRING(STR_TITLE_MSG,"DS savegame manager\nVersion 0.2.5 semi-stable\nBy Pokedoc");
+	ADD_STRING(STR_TITLE_MSG,"DS savegame manager\nVersion 0.3.0\nBy Pokedoc");
 	ADD_STRING(STR_BOOT_NO_INI,"Unable to open ini file!\nPlease make sure that it is\n1. in this apps folder, or"
 		  "\n2. in the root folder\nIf 1. does not work, use 2.");
 	ADD_STRING(STR_BOOT_MODE_UNSUPPORTED,"This mode is DISABLED.\nPlease restart the system.");

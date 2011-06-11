@@ -64,7 +64,7 @@ void mode_dsi()
 
 	// use 3in1 to buffer data
 	displayStateF(STR_EMPTY);
-	displayPrintUpper();
+	displayPrintUpper(true);
 	displayPrintLower();
 	
 	// DSi mode, does nothing at the moment
@@ -99,7 +99,7 @@ void mode_slot2()
 {
 	// use slot2 DLDI device to store data
 	displayStateF(STR_EMPTY);
-	displayPrintUpper();
+	displayPrintUpper(true);
 	displayPrintLower();
 	
 	touchPosition touchXY;
@@ -131,7 +131,7 @@ void mode_slot2()
 
 void mode_3in1()
 {
-	displayPrintUpper();
+	displayPrintUpper(true);
 	
 	dsCardData data2;
 	uint32 ime = hwGrab3in1();
@@ -185,7 +185,7 @@ void mode_gba()
 	// use 3in1 to buffer data
 	displayStateF(STR_EMPTY);
 	gbatype = gbaGetSaveType();
-	displayPrintUpper();
+	displayPrintUpper(true);
 	displayPrintLower();
 
 	touchPosition touchXY;
@@ -217,7 +217,7 @@ void mode_wifi()
 {
 	// use 3in1 to buffer data
 	displayStateF(STR_EMPTY);
-	displayPrintUpper();
+	displayPrintUpper(true);
 	displayPrintLower();
 	
 	touchPosition touchXY;
@@ -410,7 +410,9 @@ int main(int argc, char* argv[])
 		iprintf("DLDI error");
 		while (1);
 	}
+#ifdef DEBUG
 	iprintf("Found DLDI: %s\n", io_dldi_data->friendlyName);
+#endif
 	
 	// detect hardware
 	mode = hwDetect();
@@ -420,12 +422,16 @@ int main(int argc, char* argv[])
 		extra_id[i] = 0xff000000;
 		extra_size[i] = 0;
 	}
+#ifdef DEBUG
 	iprintf("Loading INI file\n");
+#endif
 	if (has_argv(argc, argv))
 		loadIniFile(argv[0]);
 	else
 		loadIniFile(0);
+#ifdef DEBUG
 	iprintf("Done!\n");
+#endif
 	
 	if (slot2 > 0)
 		mode = 4;
