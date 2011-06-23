@@ -207,8 +207,8 @@ void mode_gba()
 		
 		// erase
 		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
-			//displayPrintUpper();
-			//hwEraseGBA();
+			displayPrintUpper();
+			hwEraseGBA();
 		}
 	}
 }

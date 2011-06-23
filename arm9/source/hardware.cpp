@@ -434,6 +434,8 @@ void hwRestore3in1()
 
 void hwRestore3in1_b(uint32 size_file)
 {
+	swap_cart();
+
 	// Third, swap in a new game
 	uint32 size = auxspi_save_size_log_2(slot_1_type);
 	while ((size_file < size) || (slot_1_type == 2)) {
@@ -491,6 +493,8 @@ void hwErase()
 	displayMessage2F(STR_HW_WARN_DELETE);
 	while (!(keysCurrent() & (KEY_UP | KEY_R | KEY_Y))) {};
 	auxspi_erase(slot_1_type);
+	displayMessage2F(STR_HW_DID_DELETE);
+	while (1);
 }
 
 // --------------------------------------------------------
@@ -933,15 +937,11 @@ void hwRestoreGBA()
 
 void hwEraseGBA()
 {
-	// TODO: implement chip erase!
 	u8 type = gbaGetSaveType();
 	if ((type == 0) || (type > 5))
 		return;
 	
-	memset(data, 0, gbaGetSaveSize(type));
-	
-	switch (type) {
-	}
+	gbaFormatSave(type);
 }
 
 // -------------------------------------------------

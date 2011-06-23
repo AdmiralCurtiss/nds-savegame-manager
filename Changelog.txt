@@ -37,9 +37,9 @@ Version 0.2.4 (4-10-2011)
 - Program now makes use of lower screen for most messages, which allows longer, more detailled messages.
 - Adds a Readme file/Manual to the program.
 
-Version 0.3 (6-10-2011)
+Version 0.3 (6-??-2011)
 
-This is the first non-beta release.
+This is the first non-beta, feature complete release.
 
 - Adds the ability to translate most parts of the user interface.
 - Adds Slot 2 backup mode (you will need a Slot 2 flash card; anything that has a DLDI driver should be supported).
