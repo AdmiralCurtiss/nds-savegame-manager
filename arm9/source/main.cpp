@@ -57,6 +57,9 @@ using std::max;
 char bootdir[256] = "/";
 
 
+#define REBOOT_WIFI
+
+
 // ============================================================================
 void mode_dsi()
 {
@@ -197,18 +200,21 @@ void mode_gba()
 		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
 			displayPrintUpper();
 			hwBackupGBA(gbatype);
+			displayPrintLower();
 		}
 		
 		// restore
 		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
 			displayPrintUpper();
 			hwRestoreGBA();
+			displayPrintLower();
 		}
 		
 		// erase
 		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
 			displayPrintUpper();
 			hwEraseGBA();
+			displayPrintLower();
 		}
 	}
 }
@@ -228,12 +234,20 @@ void mode_wifi()
 		// backup
 		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
 			hwBackupFTP();
+#ifdef REBOOT_WIFI
+			displayMessage2F(STR_HW_PLEASE_REBOOT);
+			while(1);
+#endif
 			displayPrintLower();
 		}
 		
 		// restore
 		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
 			hwRestoreFTP();
+#ifdef REBOOT_WIFI
+			displayMessage2F(STR_HW_PLEASE_REBOOT);
+			while(1);
+#endif
 			displayPrintLower();
 		}
 		

@@ -57,7 +57,7 @@ void displayInit()
 
 void displayTitle()
 {
-	displayMessageF(STR_TITLE_MSG, VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
+	displayMessageF(STR_TITLE_MSG, VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO, VERSION_EXTRA);
 	
 	displayStateF(STR_STR, "Press (B) to continue");
 	while (!(keysCurrent() & KEY_B));
@@ -349,7 +349,7 @@ char *ParseLine(char *start, const char *end, int &length)
 	
 	while (start < end) {
 		if (*start == '\n') {
-			length = 1;
+			length = 0;
 			return start;
 		}
 		

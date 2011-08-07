@@ -62,7 +62,7 @@ bool stringsLoadFile(const char *fname)
 	ADD_STRING(STR_STR, "%s");
 	//
 	ADD_STRING(STR_MM_WIPE,"\n    WIPES OUT ALL SAVE DATA\n         ON YOUR GAME !");
-	ADD_STRING(STR_TITLE_MSG,"DS savegame manager\nVersion 0.3.0\nBy Pokedoc");
+	ADD_STRING(STR_TITLE_MSG,"DS savegame manager\nVersion %i.%i.%i%s\nBy Pokedoc");
 	ADD_STRING(STR_BOOT_NO_INI,"Unable to open ini file!\nPlease make sure that it is\n1. in this apps folder, or"
 		  "\n2. in the root folder\nIf 1. does not work, use 2.");
 	ADD_STRING(STR_BOOT_MODE_UNSUPPORTED,"This mode is DISABLED.\nPlease restart the system.");
@@ -113,7 +113,6 @@ bool stringsLoadFile(const char *fname)
 	remove("/tmpfile");
 	
 	// Convert manual newline commands added as plaintext in the translation file.
-	// FIXME: this does not seem to work reliably yet (or maybe it is the print function).
 	for (int i = 0; i < STR_LAST; i++) {
 		char *ptr = message_strings[i];
 		while ((ptr = strchr(ptr, '\\')) != NULL) {

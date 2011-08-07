@@ -509,6 +509,7 @@ void hwBackupSlot2()
 	uint8 type = auxspi_save_type(slot_1_type);
 
 	// just select a filename, no extra work required!
+	displayMessageF(STR_HW_SELECT_FILE_OW);
 	char path[256];
 	char fname[256] = "";
 	fileSelect("/", path, fname, 0, true, false);
@@ -568,7 +569,6 @@ void hwRestoreSlot2()
 	fileSelect("/", path, fname, 0, false, false);
 	char msg[256];
 	// This does not have to be translated.
-	// FIXME: make this more meaningful!
 	sprintf(msg, "%s/%s", path, fname);
 	
 	FILE *file = fopen(msg, "rb");
@@ -616,7 +616,9 @@ void hwRestoreSlot2()
 }
 
 // ------------------------------------------------------------
-void hwLoginFTP(netbuf **buf)
+static netbuf *buf = NULL;
+
+void hwLoginFTP()
 {
 	int j;
 	static int jmax = 10;
@@ -629,7 +631,7 @@ void hwLoginFTP(netbuf **buf)
 	displayMessage2F(STR_HW_FTP_SEEK_FTP);
 	sprintf(txt, "%s:%i", ftp_ip, ftp_port);
 	j = 0;
-	while (!FtpConnect(txt, buf)) {
+	while (!FtpConnect(txt, &buf)) {
 		j++;
 		if (j >= jmax) {
 			displayWarning2F(STR_HW_FTP_ERR_FTP);
@@ -639,7 +641,7 @@ void hwLoginFTP(netbuf **buf)
 	}
 	displayMessage2F(STR_HW_FTP_LOGIN);
 	j = 0;
-	while (!FtpLogin(ftp_user, ftp_pass, *buf)) {
+	while (!FtpLogin(ftp_user, ftp_pass, buf)) {
 		j++;
 		if (j >= jmax) {
 			displayWarning2F(STR_HW_FTP_ERR_LOGIN);
@@ -652,7 +654,7 @@ void hwLoginFTP(netbuf **buf)
 
 void hwBackupFTP(bool dlp)
 {
-	netbuf *buf, *ndata;
+	netbuf *ndata;
 
 	// Dump save and write it to FTP server
 	// First: swap card
@@ -669,7 +671,7 @@ void hwBackupFTP(bool dlp)
 
 	// Second: connect to FTP server
 	if (!ftp_active)
-		hwLoginFTP(&buf);
+		hwLoginFTP();
 	
 	char fdir[256] = "";
 	char fname[256] ="";
@@ -704,6 +706,7 @@ void hwBackupFTP(bool dlp)
 			sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
 		}
 	}
+	displayMessage2F(STR_HW_WRITE_FILE, fname);
 	
 	// Fourth: dump save
 	displayStateF(STR_EMPTY);
@@ -720,19 +723,19 @@ void hwBackupFTP(bool dlp)
 			if (delta == 0) {
 				displayMessage2F(STR_HW_FTP_READ_ONLY);
 			} else {
-				displayMessage2F(STR_EMPTY);
+				displayMessage2F(STR_HW_WRITE_FILE, fname);
 			}
 			if (delta < length) {
 				displayStateF(STR_HW_FTP_SLOW);
 			} else {
-				displayStateF(STR_EMPTY);
+				displayMessage2F(STR_HW_WRITE_FILE, fname);
 			}
 		}
 	}
 	FtpCloseAccess(buf, ndata);
-	FtpQuit(buf);
+	//FtpQuit(buf);
 	
-	Wifi_DisconnectAP();
+	//Wifi_DisconnectAP();
 
 	if (dlp) {
 		displayMessage2F(STR_HW_PLEASE_REBOOT);
@@ -800,12 +803,12 @@ bool hwRestoreFTPPartial(u32 ofs, u32 size, u32 type, netbuf *ndata)
 
 void hwRestoreFTP(bool dlp)
 {
-	netbuf *buf, *ndata;
+	netbuf *ndata;
 
 	// Dump save and write it to FTP server
 	// First: connect to FTP server
-	if (ftp_active)
-		hwLoginFTP(&buf);
+	if (!ftp_active)
+		hwLoginFTP();
 
 	// Second: select a filename
 	char fdir[256] = "";
@@ -838,9 +841,9 @@ void hwRestoreFTP(bool dlp)
 		hwRestoreFTPPartial(i << len_block, len_block, type, ndata);
 	}
 	FtpClose(ndata);
-	FtpQuit(buf);
+	//FtpQuit(buf);
 
-	Wifi_DisconnectAP();
+	//Wifi_DisconnectAP();
 
 	if (dlp) {
 		displayMessage2F(STR_HW_PLEASE_REBOOT);
@@ -856,7 +859,7 @@ void hwBackupGBA(u8 type)
 {
 	if ((type == 0) || (type > 5))
 		return;
-	
+
 	if ((type == 1) || (type == 2)) {
 		// This is not to be translated, it will be removed at some point.
 		displayMessageF(STR_STR, "I can't read this save type\nyet. Please use Rudolphs tool\ninstead.");
@@ -895,7 +898,7 @@ void hwBackupGBA(u8 type)
 	fclose(file);
 
 	displayStateF(STR_STR, "Done!");
-	while(1);
+	//while(1);
 }
 
 void hwRestoreGBA()
@@ -931,8 +934,11 @@ void hwRestoreGBA()
 	displayMessage2F(STR_HW_WRITE_GAME);
 	gbaWriteSave(0, data, size, type);
 
+	displayStateF(STR_STR, "Done!");
+/*
 	displayMessage2F(STR_HW_PLEASE_REBOOT);
 	while(1);
+	*/
 }
 
 void hwEraseGBA()
@@ -940,8 +946,13 @@ void hwEraseGBA()
 	u8 type = gbaGetSaveType();
 	if ((type == 0) || (type > 5))
 		return;
-	
+
+	displayMessage2F(STR_HW_WARN_DELETE);
+	while (!(keysCurrent() & (KEY_UP | KEY_R | KEY_Y))) {};
 	gbaFormatSave(type);
+	displayMessage2F(STR_HW_DID_DELETE);
+	while (1);
+
 }
 
 // -------------------------------------------------

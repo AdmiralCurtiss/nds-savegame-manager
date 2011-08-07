@@ -28,3 +28,6 @@ A small library for parsing ini files. Mostly untouched.
 - *.i
 - ini.cpp
 
+Debug target:
+I have finally added a debug build target, which prints some additional information on the screen. You should never need it, but one never knows. Since my skills at writing makefiles su... erm... could be better, you will need to run a "make clean" before running "make debug". If you want to add additional debug output without having to worry about removing it on a new release, just add an "#ifdef DEBUG ... #endif" block around your debug code.
+

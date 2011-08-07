@@ -204,6 +204,12 @@ void gbaEepromRead8Bytes(u8 *out, u32 addr, bool short_addr = false)
 		buf[15] = addr;
 		buf[16] = 0;
 	}
+	for (int i = 0; i < 17; i++) {
+		if (buf[i])
+			buf[i] = 255;
+		else
+			buf[i] = 0;
+	}
 	
 	static u32 eeprom = 0x09ffff00;
 
@@ -491,7 +497,6 @@ bool gbaWriteSave(u32 dst, u8 *src, u32 len, u8 type)
 		// FIXME: currently, you can only write "all or nothing"
 		nbanks = 2;
 		for (int j = 0; j < nbanks; j++) {
-			displayStateF(STR_STR, "Switching Bank.");
 			*(u8*)0x0a005555 = 0xaa;
 			swiDelay(10);
 			*(u8*)0x0a002aaa = 0x55;
