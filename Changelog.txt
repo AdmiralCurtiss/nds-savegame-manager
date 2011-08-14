@@ -37,13 +37,13 @@ Version 0.2.4 (4-10-2011)
 - Program now makes use of lower screen for most messages, which allows longer, more detailled messages.
 - Adds a Readme file/Manual to the program.
 
-Version 0.3.0 RC1 (8-??-2011)
+Version 0.3.0 RC1 (8-14-2011)
 
-This is the first non-beta, feature complete release.
+This is the first non-beta, feature complete release. It implements everything I know how to do. From now on, progress will be much slower (i.e. only when somebody figures out something new). If you want to start your own fork, this is the perfect time - there will be no more significant updates in the forseeable future (except for bug fixes and new translations).
 
 - Adds the ability to translate most parts of the user interface.
 - Adds Slot 2 backup mode (you will need a Slot 2 flash card; anything that has a DLDI driver should be supported).
-- Enables FTP restore mode for saves bigger than the memory buffer (usually 2 MB).
-- Various stability fixes.
+- Enables FTP restore mode for saves bigger than the memory buffer (usually 2 MB), it now uses multiple passes in this case.
+- Various stability fixes, especially aimed for R4 clones.
 - Many behind-the scenes improvements aimed to simplify further hacking.
 - Instruction file is no longer beta.
