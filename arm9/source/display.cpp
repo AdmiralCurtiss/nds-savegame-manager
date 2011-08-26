@@ -79,10 +79,12 @@ void displayPrintUpper(bool fc)
 	iprintf("Game name:\n");
 	iprintf("Game save:\n");
 	iprintf("Special  :\n");
-	iprintf("--- SLOT 2 ---------------------");
-	if (dstype > 0)
-		iprintf("This device has no Slot 2\n");
-	else {
+	if (dstype == 1) {
+		// DSi mode
+		iprintf("--- SD-SLOT --------------------");
+		iprintf("Status   :\n");
+	} else {
+		// old DS phat/lite
 		iprintf("Game ID  :\n");
 		iprintf("Game name:\n");
 		iprintf("Game save:\n");
@@ -97,9 +99,6 @@ void displayPrintUpper(bool fc)
 	
 	// fetch cartridge header (maybe, calling "cardReadHeader" on a FC messes with libfat!)
 	sNDSHeader nds;
-	// The CycloDS iEvolution detects asd a game, probably to cheat Nintendos firmware.
-	//  I might be able to fix this, to add autodetection, but I have decided against this,
-	//  since the same method would also offer Nintendo a way to lock out this card!
 	if (!fc && (slot_1_type != AUXSPI_FLASH_CARD))
 		cardReadHeader((uint8*)&nds);
 	else
@@ -119,7 +118,11 @@ void displayPrintUpper(bool fc)
 		sprintf(&name[0], "3in1");
 		break;
 	case 3:
-		sprintf(&name[0], "DSi/SD");
+		if (sdslot) {
+			sprintf(&name[0], "DSi/SD");
+		} else {
+			sprintf(&name[0], "DSi/iEvo");
+		}
 		break;
 	case 4:
 		sprintf(&name[0], "Slot 2");
@@ -146,6 +149,8 @@ void displayPrintUpper(bool fc)
 		memcpy(&name[0], &nds.gameCode[0], 4);
 		name[4] = 0x00;
 	}
+	if (dstype == 1)
+		sprintf(name, "LOCKED");
 	consoleClear();
 	iprintf("%s", name);
 
@@ -158,6 +163,8 @@ void displayPrintUpper(bool fc)
 		memcpy(&name[0], &nds.gameTitle[0], 12);
 		name[12] = 0x00;
 	}
+	if (dstype == 1)
+		sprintf(name, "LOCKED");
 	consoleClear();
 	iprintf("%s", name);
 
@@ -187,6 +194,8 @@ void displayPrintUpper(bool fc)
 			break;
 		}
 	}
+	if (dstype == 1)
+		sprintf(name, "LOCKED");
 	consoleClear();
 	iprintf("%s", name);
 
@@ -207,9 +216,25 @@ void displayPrintUpper(bool fc)
 		default:
 			sprintf(&name[0], "----");
 	}
+	if (dstype == 1)
+		sprintf(name, "LOCKED");
+	consoleClear();
 	iprintf("%s", name);
 	
-	// Slot 2 status
+	// Slot 2/SD status
+	if (dstype == 1) {
+		consoleSetWindow(&upperScreen, 10, 8, 22, 1);
+		consoleClear();
+		memset(&name[0], 0, MAXPATHLEN);
+		// Test if we booted from sudokuhax/DSi Homebrew Channel,
+		//  which means that the SD-slot is accessible.
+		if (sdslot)
+			iprintf("Available.");
+		else
+			iprintf("LOCKED.");
+		
+		return;
+	}
 	// 5) GBA game id
 	consoleSetWindow(&upperScreen, 10, 8, 22, 1);
 	consoleClear();

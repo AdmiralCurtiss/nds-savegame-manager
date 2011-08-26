@@ -171,8 +171,10 @@ u32 hwDetect()
 	// First, look for a DSi running in DSi mode.
 	if (isDsi()) {
 		size_buf = 1 << 23; // 8 MB memory buffer
+		sdslot = true;
 		return 3;
 	}
+	sdslot = false;
 	size_buf = 1 << 21; // 2 MB memory buffer
 	
 	// Identify Slot 2 device.	
@@ -246,19 +248,24 @@ void hwFormatNor(uint32 page, uint32 count)
 // --------------------------------------------------------
 void hwBackupDSi()
 {
-	hwBackupFTP();
+	if (!sdslot)
+		return;
+	
+	// only works from dsiwarehax
+	char path[256];
+	char fname[256] = "";
+	fileSelect("sd:/", path, fname, 0, false, false);
 }
 
 void hwRestoreDSi()
 {
-	hwRestoreFTP();
-
-/*
-	// only works from NOR!
+	if (!sdslot)
+		return;
+	
+	// only works from dsiwarehax
 	char path[256];
 	char fname[256] = "";
 	fileSelect("sd:/", path, fname, 0, true, false);
-	*/
 }
 
 // --------------------------------------------------------

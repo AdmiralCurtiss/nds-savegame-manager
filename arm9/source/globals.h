@@ -58,6 +58,8 @@ extern u32 ezflash;
 
 extern int slot2;
 
+extern bool sdslot;
+
 // this should be enough for the forseeable future
 #define EXTRA_ARRAY_SIZE 16
 

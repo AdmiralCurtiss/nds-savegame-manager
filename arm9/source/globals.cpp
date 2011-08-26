@@ -47,5 +47,7 @@ u32 ezflash = 0;
 
 int slot2 = -1;
 
+bool sdslot = false;
+
 u32 extra_id[EXTRA_ARRAY_SIZE];
 u8 extra_size[EXTRA_ARRAY_SIZE];

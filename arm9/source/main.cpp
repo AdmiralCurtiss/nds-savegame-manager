@@ -71,8 +71,7 @@ void mode_dsi()
 	displayPrintLower();
 	
 	// DSi mode, does nothing at the moment
-	displayWarning2F(STR_BOOT_MODE_UNSUPPORTED);
-	while(1);
+	displayMessageF(STR_BOOT_MODE_UNSUPPORTED);
 
 	touchPosition touchXY;
 	while(1) {
@@ -91,9 +90,9 @@ void mode_dsi()
 		
 		// erase
 		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
-			swap_cart();
-			displayPrintUpper();
-			hwErase();
+			//swap_cart();
+			//displayPrintUpper();
+			//hwErase();
 		}
 	}
 }
@@ -327,6 +326,10 @@ bool loadIniFile(char* path)
 		while (1);
 	}
 	
+#ifdef DEBUG
+	iprintf("Found and parsed INI file.\n");
+#endif
+	
 	ini_locateHeading(ini, "");
 	ini_locateKey(ini, "ftp_ip");
 	ini_readString(ini, ftp_ip, 16);
@@ -360,6 +363,7 @@ bool loadIniFile(char* path)
 		extra_size[i] = tmp;
 	}
 
+	txt[0] = 0;
 	ini_locateHeading(ini, "");
 	ini_locateKey(ini, "language");
 	ini_readString(ini, txt, 256);
@@ -400,8 +404,10 @@ bool has_argv(int argc, char* argv[])
 			return true;
 
 	if (*arg0 == 's')
-		if (!strncasecmp(argv[0], "sd:/", 4))
+		if (!strncasecmp(argv[0], "sd:/", 4)) {
+			sdslot = true; // for sudokuhax
 			return true;
+		}
 	
 	if (*arg0 == '/')
 		return true;
@@ -439,10 +445,17 @@ int main(int argc, char* argv[])
 #ifdef DEBUG
 	iprintf("Loading INI file\n");
 #endif
-	if (has_argv(argc, argv))
+	if (has_argv(argc, argv)) {
+#ifdef DEBUG
+		iprintf("argv folder: %s\n", argv[0]);
+#endif
 		loadIniFile(argv[0]);
-	else
+	} else {
+#ifdef DEBUG
+		iprintf("Bad/no argv folder!\n", argv[0]);
+#endif
 		loadIniFile(0);
+	}
 #ifdef DEBUG
 	iprintf("Done!\n");
 #endif
@@ -459,10 +472,16 @@ int main(int argc, char* argv[])
 	// On my Cyclops, no 2MB buffer is available after loading strings! bad memory management?
 	//  Anyway, we can't do anything except for the following (which restricts the usefulness
 	//  of FTP safe mode)
+#ifdef DEBUG
+	iprintf("Allocating memory buffer.\n");
+#endif
 	while (data == NULL) {
 		size_buf >>= 1;
 		data = (u8*)malloc(size_buf);
 	}
+#ifdef DEBUG
+	iprintf("Done! We now have %x.\n", size_buf);
+#endif
 	
 	// Init the screens
 	displayTitle();

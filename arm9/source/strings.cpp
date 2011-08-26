@@ -39,8 +39,10 @@ using namespace std;
 char **message_strings;
 
 #define ADD_STRING(id,text) sprintf(txt, "%i", id);\
-	if (ini_locateKey(ini, txt) == 0) {\
-		ini_readString(ini, txt, 256);\
+	if (ini) {\
+		if (ini_locateKey(ini, txt) == 0) {\
+			ini_readString(ini, txt, 256);\
+		} \
 	} else {\
 		strcpy(txt,text);\
 	}\
@@ -50,13 +52,25 @@ char **message_strings;
 
 bool stringsLoadFile(const char *fname)
 {
+#ifdef DEBUG
+	iprintf("Trying to access strings file.\n");
+#endif
 	// load ini file...
 	ini_fd_t ini = 0;
 	if (fileExists(fname))
 		ini = ini_open(fname, "r", "");
+	
+	// On the DSi/sudokuhax platform, "fileExists" always returns true, so we need to test if
+	//  we actually got something. This is merged in the macro, but we keep some debug output.
+#ifdef DEBUG
+	if (!ini) {
+		iprintf("Parsing %s failed!\n", fname);
+	}
+#endif
 
 	message_strings = new char*[STR_LAST];
-	ini_locateHeading(ini, "");
+	if (ini)
+		ini_locateHeading(ini, "");
 
 	ADD_STRING(STR_EMPTY, "");
 	ADD_STRING(STR_STR, "%s");
