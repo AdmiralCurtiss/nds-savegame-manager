@@ -57,6 +57,14 @@ using std::max;
 char bootdir[256] = "/";
 
 
+#define LIBNDS_VER ((_LIBNDS_MAJOR_ << 16) | (_LIBNDS_MINOR_ << 8) | (_LIBNDS_PATCH_))
+
+// needs libnds version 1.5.4, for the SDHC driver on the DSi.
+#if (LIBNDS_VER < 0x00010504)
+#error "Your libnds version is outdated! Please use 1.5.4 or higher!"
+#endif
+
+
 #define REBOOT_WIFI
 
 

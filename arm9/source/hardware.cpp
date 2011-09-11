@@ -246,26 +246,134 @@ void hwFormatNor(uint32 page, uint32 count)
 }
 
 // --------------------------------------------------------
+// uncomment this to enable slot 1 operations... but implement "dsiUnlockSlot1()" before!
+// the following two functions are *untested* and may not work at all!
+//#define SLOT_1_UNLOCKED
+
 void hwBackupDSi()
 {
+	// only works from dsiwarehax
 	if (!sdslot)
 		return;
+
+#ifdef SLOT_1_UNLOCKED
+	// swap game
+	swap_cart();
+	displayPrintUpper();
+#endif
+
+	uint8 size = auxspi_save_size_log_2(slot_1_type);
+	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
+	uint8 type = auxspi_save_type(slot_1_type);
+
+	// select target filename
+	displayMessageF(STR_HW_SELECT_FILE_OW);
 	
-	// only works from dsiwarehax
 	char path[256];
 	char fname[256] = "";
-	fileSelect("sd:/", path, fname, 0, false, false);
+	fileSelect("sd:/", path, fname, 0, true, false);
+	
+	// look for an unused filename
+	if (!fname[0]) {
+		char *gamename = (char*)0x080000a0;
+		uint32 cnt = 0;
+		sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
+		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
+		while (fileExists(fname)) {
+			if (cnt < 65536)
+				cnt++;
+			else {
+				displayWarning2F(STR_ERR_NO_FNAME);
+				while(1);
+			}
+			sprintf(fname, "%s.%i.sav", gamename, cnt);
+		}
+	}
+	char fullpath[256];
+	sprintf(fullpath, "%s/%s", path, fname);
+	displayMessage2F(STR_HW_WRITE_FILE, fullpath);
+
+	// backup the file
+	FILE *file = fopen(fullpath, "wb");
+	if (size < 16)
+		size_blocks = 1;
+	else
+		size_blocks = 1 << (size - 16);
+	u32 LEN = min(1 << size, 1 << 16);
+	for (int i = 0; i < size_blocks; i++) {
+		displayProgressBar(i+1, size_blocks);
+		auxspi_read_data(i << 8, data, LEN, type, slot_1_type);
+		fwrite(data, 1, LEN, file);
+	}
+	fclose(file);
+	
+	displayProgressBar(0,0);
+	displayMessageF(STR_EMPTY);
 }
 
 void hwRestoreDSi()
 {
+	// only works from dsiwarehax
 	if (!sdslot)
 		return;
 	
-	// only works from dsiwarehax
+#ifdef SLOT_1_UNLOCKED
+	// swap game
+	swap_cart();
+	displayPrintUpper();
+#endif
+
+	uint8 size = auxspi_save_size_log_2(slot_1_type);
+	uint8 type = auxspi_save_type(slot_1_type);
+
+	// select source filename
 	char path[256];
 	char fname[256] = "";
 	fileSelect("sd:/", path, fname, 0, true, false);
+
+	// format game if required
+	if (type == 3) {
+		displayMessage2F(STR_HW_FORMAT_GAME);
+		auxspi_erase(slot_1_type);
+	}
+	
+	// and finally, write save
+	displayMessage2F(STR_HW_WRITE_GAME);
+	u32 LEN = 0, num_blocks = 0, shift = 0;
+	switch (type) {
+	case 1:
+		shift = 4; // 16 bytes
+		break;
+	case 2:
+		shift = 5; // 32 bytes
+		break;
+	case 3:
+		shift = 8; // 256 bytes
+		break;
+	default:
+		return;
+	}
+	LEN = 1 << shift;
+	num_blocks = 1 << (size - shift);
+
+	char msg[256];
+	sprintf(msg, "%s/%s", path, fname);
+	FILE *file = fopen(msg, "rb");
+	if (!file) {
+		iprintf("Error!");
+		while (1);
+	}
+	for (unsigned int i = 0; i < num_blocks; i++) {
+		if (i % (num_blocks >> 6) == 0)
+			displayProgressBar(i+1, num_blocks);
+		fread(data, 1, LEN, file);
+		sysSetBusOwners(true, true);
+		auxspi_write_data(i << shift, data, LEN, type, slot_1_type);
+	}
+	fclose(file);
+	
+	displayProgressBar(0,0);
+	displayMessageF(STR_EMPTY);
 }
 
 // --------------------------------------------------------
@@ -575,7 +683,6 @@ void hwRestoreSlot2()
 	displayMessageF(STR_HW_SELECT_FILE); // lower screen is used for file browser
 	fileSelect("/", path, fname, 0, false, false);
 	char msg[256];
-	// This does not have to be translated.
 	sprintf(msg, "%s/%s", path, fname);
 	
 	FILE *file = fopen(msg, "rb");
@@ -669,12 +776,7 @@ void hwBackupFTP(bool dlp)
 		swap_cart();
 	displayPrintUpper();
 	uint8 size = auxspi_save_size_log_2(slot_1_type);
-	int size_blocks = 1 << max(0, (int8(size) - 18)); // ... in units of 0x40000 bytes - that's 256 kB
 	uint8 type = auxspi_save_type(slot_1_type);
-	if (size < 15)
-		size_blocks = 1;
-	else
-		size_blocks = 1 << (uint8(size) - 15);
 
 	// Second: connect to FTP server
 	if (!ftp_active)
@@ -688,11 +790,6 @@ void hwBackupFTP(bool dlp)
 	fileSelect("/", fdir, fname, buf, true, false);
 	displayMessageF(STR_EMPTY);
 	displayStateF(STR_EMPTY);
-	bool newfile;
-	if (!fname[0])
-		newfile = true;
-	else
-		newfile = false;
 	
 	// Third: get a new target filename
 	FtpChdir(fdir, buf);
@@ -772,8 +869,8 @@ bool hwRestoreFTPPartial(u32 ofs, u32 size, u32 type, netbuf *ndata)
 		pdata += 512;
 	}
 
-	// Write to game (safe mode)
-	u32 LEN = 0, num_blocks = 0, shift = 0;
+	// Write to game
+	u32 LEN = 0, shift = 0;
 	switch (type) {
 	case 1:
 		shift = 4; // 16 bytes
@@ -788,7 +885,6 @@ bool hwRestoreFTPPartial(u32 ofs, u32 size, u32 type, netbuf *ndata)
 		return false;
 	}
 	LEN = 1 << shift;
-	num_blocks = 1 << (size - shift);
 	if (type == 3) {
 		displayMessage2F(STR_HW_FORMAT_GAME);
 		u32 sector = ofs >> 16;

@@ -276,13 +276,20 @@ void fileSelect(const char *startdir, char *out_dir, char *out_fname, netbuf *bu
 }
 
 // -------------------------------------------------------
+// This is a standard textbook-style "fileExists" function.
 bool fileExists(const char *fname)
 {
 	struct stat statbuf;
+	memset(&statbuf, 0, sizeof(statbuf));
     if (stat(fname, &statbuf) != 0)
 		return false;
-	else
-		return true;
+	else {
+		// on dsiwarehaxx, this additional check is required
+		if (statbuf.st_size)
+			return true;
+		else
+			return false;
+	}
 }
 
 uint32 fileSize(const char *fname)
