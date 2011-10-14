@@ -27,6 +27,7 @@
 #include "auxspi.h"
 #include "hardware.h"
 #include "globals.h"
+#include "display.h"
 
 #include <algorithm>
 
@@ -89,7 +90,6 @@ uint8 type2_size(auxspi_extra extra)
 }
 
 // ========================================================
-
 uint8 auxspi_save_type(auxspi_extra extra)
 {
 	uint32 jedec = auxspi_save_jedec_id(extra); // 9f
@@ -130,6 +130,7 @@ uint32 auxspi_save_jedec_id(auxspi_extra extra)
 	uint32 id = 0;
 	if (extra)
 		auxspi_disable_extra(extra);
+	
 	auxspi_open(0);
 	auxspi_write(0x9f);
 	id |= auxspi_read() << 16;
@@ -323,7 +324,7 @@ void auxspi_disable_big_protection()
 auxspi_extra auxspi_has_extra()
 {
 	sysSetBusOwners(true, true);
-
+	
 	// Trying to read the save size in IR mode will fail on non-IR devices.
 	// If we have success, it is an IR device.
 	u8 size2 = auxspi_save_size_log_2(AUXSPI_INFRARED);

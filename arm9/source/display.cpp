@@ -85,6 +85,7 @@ void displayPrintUpper(bool fc)
 		iprintf("Status   :\n");
 	} else {
 		// old DS phat/lite
+		iprintf("--- SLOT 2 ---------------------");
 		iprintf("Game ID  :\n");
 		iprintf("Game name:\n");
 		iprintf("Game save:\n");
@@ -176,6 +177,8 @@ void displayPrintUpper(bool fc)
 	} else {
 		uint8 type = auxspi_save_type(slot_1_type);
 		uint8 size = auxspi_save_size_log_2(slot_1_type);
+		// some debug output may need this so iprintf prints to the correct region
+		consoleSetWindow(&upperScreen, 10, 5, 22, 1);
 		switch (type) {
 		case 1:
 			sprintf(&name[0], "Eeprom (%i Bytes)", size);
@@ -552,4 +555,18 @@ void displayWarning2F(int id, ...)
 		if (start >= end)
 			break;
 	}
+}
+
+void displayDebugF(const char *format, ...)
+{
+	va_list argp;
+	va_start(argp, format);
+	memset(txt, 0, 256);
+	
+	consoleSelect(&upperScreen);
+	consoleSetWindow(&upperScreen, 0, 12, 32, 4);
+	consoleClear();
+	
+	vprintf(format, argp);
+	va_end(argp);
 }

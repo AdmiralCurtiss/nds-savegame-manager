@@ -777,7 +777,7 @@ void hwBackupFTP(bool dlp)
 	displayPrintUpper();
 	uint8 size = auxspi_save_size_log_2(slot_1_type);
 	uint8 type = auxspi_save_type(slot_1_type);
-
+	
 	// Second: connect to FTP server
 	if (!ftp_active)
 		hwLoginFTP();

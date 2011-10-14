@@ -51,6 +51,8 @@ void displayStateF(int id, ...);
 
 void displayProgressBar(int cur, int max0);
 
+void displayDebugF(const char *format, ...);
+
 
 
 #endif

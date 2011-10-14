@@ -34,6 +34,10 @@
 #define VERSION_MICRO 0
 #define VERSION_EXTRA "RC2"
 
+// this enables a custom font. it does not work yet, stuff is missing, so please uncomment
+//  this line only for testing and development purposes!
+//#define ENABLE_CUSTOM_FONT
+
 extern u8 *data;
 extern u32 size_buf;
 

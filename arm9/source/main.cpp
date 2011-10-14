@@ -228,8 +228,7 @@ void mode_gba()
 
 void mode_wifi()
 {
-	// use 3in1 to buffer data
-	displayStateF(STR_EMPTY);
+	//displayStateF(STR_EMPTY);
 	displayPrintUpper(true);
 	displayPrintLower();
 	
@@ -472,7 +471,7 @@ int main(int argc, char* argv[])
 		mode = 4;
 
 	// load strings
-	// "txt" is used as a temp buffer for the language file name
+	// "txt" is used as a temp buffer for the language file name, returned by hwDetect
 	stringsLoadFile(txt);
 
 	// prepare the global data buffer
