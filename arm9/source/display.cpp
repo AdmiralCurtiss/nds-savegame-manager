@@ -37,6 +37,11 @@
 #include "globals.h"
 #include "strings.h"
 
+// some more recent versions no longer define this macro...
+#ifndef MAXPATHLEN
+#define MAXPATHLEN 128
+#endif
+
 
 PrintConsole upperScreen;
 PrintConsole lowerScreen;
