@@ -192,12 +192,22 @@ void fileSelect(const char *startdir, char *out_dir, char *out_fname, netbuf *bu
 				if (sel_file >= first_file + size_list - 1)
 					first_file = sel_file - (size_list - 1);
 				filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
+			} else {
+				// wrap around to top of list
+				sel_file = 0;
+				first_file = 0;
+				filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
 			}
 		} else if (keys & KEY_UP) {
 			if (sel_file > 0) {
 				sel_file--;
 				if (sel_file < first_file)
 					first_file = sel_file;
+				filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
+			} else {
+				// wrap around to bottom of list
+				sel_file = num_files - 1;
+				first_file = sel_file - (size_list - 1);
 				filePrintFileList(startdir, first_file, sel_file, num_files, allow_cancel);
 			}
 		} else if (keys & KEY_A) {
