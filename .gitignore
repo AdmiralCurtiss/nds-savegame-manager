@@ -1,0 +1,7 @@
+arm7/build
+arm7/savegame_manager.elf
+arm9/build
+arm9/savegame_manager.elf
+savegame_manager.nds
+*.exe
+*.dldi
