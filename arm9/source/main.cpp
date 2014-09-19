@@ -74,8 +74,9 @@ enum main_mode {
 	Erase
 };
 
-enum main_mode select_main_screen_option()
+enum main_mode select_main_screen_option(int* cursor)
 {
+	// touch screen selection
 	touchPosition touchXY;
 	touchRead(&touchXY);
 	
@@ -91,6 +92,22 @@ enum main_mode select_main_screen_option()
 		return Erase;
 	}
 	
+	// button based selection
+	scanKeys();
+	uint32 keys = keysDown();
+	if (keys & KEY_DOWN) { (*cursor)++; }
+	if (keys & KEY_UP) { (*cursor)--; }
+	if (*cursor < 0) { *cursor = 2; }
+	if (*cursor > 2) { *cursor = 0; }
+	
+	if (keys & KEY_A) {
+		switch (*cursor) {
+			case 0: return Backup;
+			case 1: return Restore;
+			case 2: return Erase;
+		}
+	}
+	
 	return None;
 }
 
@@ -102,14 +119,15 @@ void mode_dsi()
 	// use 3in1 to buffer data
 	displayStateF(STR_EMPTY);
 	displayPrintUpper(true);
-	displayPrintLower();
 	
 	// DSi mode, does nothing at the moment
 	displayMessageF(STR_BOOT_MODE_UNSUPPORTED);
 
+	int cursor_position = 0;
 	while(1) {
 		swiWaitForVBlank();
-		enum main_mode mode = select_main_screen_option();
+		enum main_mode mode = select_main_screen_option(&cursor_position);
+		displayPrintLower( cursor_position );
 		
 		if (mode == Backup) {
 			hwBackupDSi();
@@ -132,27 +150,25 @@ void mode_slot2()
 	// use slot2 DLDI device to store data
 	displayStateF(STR_EMPTY);
 	displayPrintUpper(true);
-	displayPrintLower();
 	
+	int cursor_position = 0;
 	while(1) {
 		swiWaitForVBlank();
-		enum main_mode mode = select_main_screen_option();
+		enum main_mode mode = select_main_screen_option(&cursor_position);
+		displayPrintLower( cursor_position );
 		
 		if (mode == Backup) {
 			hwBackupSlot2();
-			displayPrintLower();
 		}
 
 		if (mode == Restore) {
 			hwRestoreSlot2();
-			displayPrintLower();
 		}
 		
 		if (mode == Erase) {
 			swap_cart();
 			displayPrintUpper();
 			hwErase();
-			displayPrintLower();
 		}
 	}
 }
@@ -177,11 +193,12 @@ void mode_3in1()
 	}
 	displayMessageF(STR_EMPTY);
 	displayProgressBar(0,0);
-	displayPrintLower();
 	
+	int cursor_position = 0;
 	while(1) {
 		swiWaitForVBlank();
-		enum main_mode mode = select_main_screen_option();
+		enum main_mode mode = select_main_screen_option(&cursor_position);
+		displayPrintLower( cursor_position );
 		
 		if (mode == Backup) {
 			hwBackup3in1();
@@ -195,7 +212,6 @@ void mode_3in1()
 			swap_cart();
 			displayPrintUpper();
 			hwErase();
-			displayPrintLower();
 		}
 	}
 }
@@ -210,28 +226,26 @@ void mode_gba()
 	displayStateF(STR_EMPTY);
 	gbatype = gbaGetSaveType();
 	displayPrintUpper(true);
-	displayPrintLower();
 
+	int cursor_position = 0;
 	while(1) {
 		swiWaitForVBlank();
-		enum main_mode mode = select_main_screen_option();
+		enum main_mode mode = select_main_screen_option(&cursor_position);
+		displayPrintLower( cursor_position );
 		
 		if (mode == Backup) {
 			displayPrintUpper();
 			hwBackupGBA(gbatype);
-			displayPrintLower();
 		}
 		
 		if (mode == Restore) {
 			displayPrintUpper();
 			hwRestoreGBA();
-			displayPrintLower();
 		}
 		
 		if (mode == Erase) {
 			displayPrintUpper();
 			hwEraseGBA();
-			displayPrintLower();
 		}
 	}
 }
@@ -240,11 +254,12 @@ void mode_wifi()
 {
 	//displayStateF(STR_EMPTY);
 	displayPrintUpper(true);
-	displayPrintLower();
 	
+	int cursor_position = 0;
 	while(1) {
 		swiWaitForVBlank();
-		enum main_mode mode = select_main_screen_option();
+		enum main_mode mode = select_main_screen_option(&cursor_position);
+		displayPrintLower( cursor_position );
 		
 		if (mode == Backup) {
 			hwBackupFTP();
@@ -252,7 +267,6 @@ void mode_wifi()
 			displayMessage2F(STR_HW_PLEASE_REBOOT);
 			while(1);
 #endif
-			displayPrintLower();
 		}
 		
 		if (mode == Restore) {
@@ -261,14 +275,12 @@ void mode_wifi()
 			displayMessage2F(STR_HW_PLEASE_REBOOT);
 			while(1);
 #endif
-			displayPrintLower();
 		}
 		
 		if (mode == Erase) {
 			swap_cart();
 			displayPrintUpper();
 			hwErase();
-			displayPrintLower();
 		}
 	}
 }
@@ -278,15 +290,16 @@ void mode_dlp()
 	// use non-flash card based exploits (download play or Sudoku?). untested, and does not work yet!
 	displayStateF(STR_EMPTY);
 	displayPrintUpper();
-	displayPrintLower();
 	
 	// DSi mode, does nothing at the moment
 	displayMessage2F(STR_STR, "I did not expect that you can trigger this mode at all!");
 	while(1);
 
+	int cursor_position = 0;
 	while(1) {
 		swiWaitForVBlank();
-		enum main_mode mode = select_main_screen_option();
+		enum main_mode mode = select_main_screen_option(&cursor_position);
+		displayPrintLower( cursor_position );
 		
 		if (mode == Backup) {
 			hwBackupFTP(true);

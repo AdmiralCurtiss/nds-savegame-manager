@@ -329,7 +329,7 @@ void displayPrintUpper(bool fc)
 		iprintf(name);
 }
 
-void displayPrintLower()
+void displayPrintLower( int cursor_position )
 {
 	consoleSelect(&lowerScreen);
 	consoleSetWindow(&lowerScreen, 0, 0, 32, 24);
@@ -351,15 +351,27 @@ void displayPrintLower()
 	iprintf("+------------------------------+");
 
 	consoleSetWindow(&lowerScreen, 1, 1, 30, 6);
-	iprintf("\n\n            BACKUP\n");
+	if ( cursor_position == 0 ) {
+		iprintf("\n\n       ==>  BACKUP  <==\n");
+	} else {
+		iprintf("\n\n            BACKUP\n");
+	}
 	iprintf("         Game -> .sav");
 
 	consoleSetWindow(&lowerScreen, 1, 9, 30, 6);
-	iprintf("\n\n            RESTORE\n");
+	if ( cursor_position == 1 ) {
+		iprintf("\n\n       ==>  RESTORE  <==\n");
+	} else {
+		iprintf("\n\n            RESTORE\n");
+	}
 	iprintf("         .sav -> Game");
 
 	consoleSetWindow(&lowerScreen, 1, 17, 30, 6);
-	iprintf("\n             RESET\n");
+	if ( cursor_position == 2 ) {
+		iprintf("\n\n        ==>  RESET  <==\n");
+	} else {
+		iprintf("\n\n             RESET\n");
+	}
 	iprintf(stringsGetMessageString(STR_MM_WIPE));
 }
 
