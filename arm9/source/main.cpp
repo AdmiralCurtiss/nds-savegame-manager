@@ -67,6 +67,32 @@ char bootdir[256] = "/";
 
 #define REBOOT_WIFI
 
+enum main_mode {
+	None,
+	Backup,
+	Restore,
+	Erase
+};
+
+enum main_mode select_main_screen_option()
+{
+	touchPosition touchXY;
+	touchRead(&touchXY);
+	
+	if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
+		return Backup;
+	}
+
+	if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
+		return Restore;
+	}
+		
+	if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
+		return Erase;
+	}
+	
+	return None;
+}
 
 // ============================================================================
 void mode_dsi()
@@ -81,23 +107,19 @@ void mode_dsi()
 	// DSi mode, does nothing at the moment
 	displayMessageF(STR_BOOT_MODE_UNSUPPORTED);
 
-	touchPosition touchXY;
 	while(1) {
 		swiWaitForVBlank();
-		touchRead(&touchXY);
+		enum main_mode mode = select_main_screen_option();
 		
-		// backup
-		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
+		if (mode == Backup) {
 			hwBackupDSi();
 		}
 		
-		// restore
-		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
+		if (mode == Restore) {
 			hwRestoreDSi();
 		}
 		
-		// erase
-		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
+		if (mode == Erase) {
 			//swap_cart();
 			//displayPrintUpper();
 			//hwErase();
@@ -112,25 +134,21 @@ void mode_slot2()
 	displayPrintUpper(true);
 	displayPrintLower();
 	
-	touchPosition touchXY;
 	while(1) {
 		swiWaitForVBlank();
-		touchRead(&touchXY);
+		enum main_mode mode = select_main_screen_option();
 		
-		// backup
-		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
+		if (mode == Backup) {
 			hwBackupSlot2();
 			displayPrintLower();
 		}
-		
-		// restore
-		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
+
+		if (mode == Restore) {
 			hwRestoreSlot2();
 			displayPrintLower();
 		}
 		
-		// erase
-		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
+		if (mode == Erase) {
 			swap_cart();
 			displayPrintUpper();
 			hwErase();
@@ -161,23 +179,19 @@ void mode_3in1()
 	displayProgressBar(0,0);
 	displayPrintLower();
 	
-	touchPosition touchXY;
 	while(1) {
 		swiWaitForVBlank();
-		touchRead(&touchXY);
+		enum main_mode mode = select_main_screen_option();
 		
-		// backup
-		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
+		if (mode == Backup) {
 			hwBackup3in1();
 		}
 		
-		// restore
-		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
+		if (mode == Restore) {
 			hwRestore3in1();
 		}
 		
-		// erase
-		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
+		if (mode == Erase) {
 			swap_cart();
 			displayPrintUpper();
 			hwErase();
@@ -198,27 +212,23 @@ void mode_gba()
 	displayPrintUpper(true);
 	displayPrintLower();
 
-	touchPosition touchXY;
 	while(1) {
 		swiWaitForVBlank();
-		touchRead(&touchXY);
+		enum main_mode mode = select_main_screen_option();
 		
-		// backup
-		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
+		if (mode == Backup) {
 			displayPrintUpper();
 			hwBackupGBA(gbatype);
 			displayPrintLower();
 		}
 		
-		// restore
-		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
+		if (mode == Restore) {
 			displayPrintUpper();
 			hwRestoreGBA();
 			displayPrintLower();
 		}
 		
-		// erase
-		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
+		if (mode == Erase) {
 			displayPrintUpper();
 			hwEraseGBA();
 			displayPrintLower();
@@ -232,13 +242,11 @@ void mode_wifi()
 	displayPrintUpper(true);
 	displayPrintLower();
 	
-	touchPosition touchXY;
 	while(1) {
 		swiWaitForVBlank();
-		touchRead(&touchXY);
+		enum main_mode mode = select_main_screen_option();
 		
-		// backup
-		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
+		if (mode == Backup) {
 			hwBackupFTP();
 #ifdef REBOOT_WIFI
 			displayMessage2F(STR_HW_PLEASE_REBOOT);
@@ -247,8 +255,7 @@ void mode_wifi()
 			displayPrintLower();
 		}
 		
-		// restore
-		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
+		if (mode == Restore) {
 			hwRestoreFTP();
 #ifdef REBOOT_WIFI
 			displayMessage2F(STR_HW_PLEASE_REBOOT);
@@ -257,8 +264,7 @@ void mode_wifi()
 			displayPrintLower();
 		}
 		
-		// erase
-		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
+		if (mode == Erase) {
 			swap_cart();
 			displayPrintUpper();
 			hwErase();
@@ -278,23 +284,19 @@ void mode_dlp()
 	displayMessage2F(STR_STR, "I did not expect that you can trigger this mode at all!");
 	while(1);
 
-	touchPosition touchXY;
 	while(1) {
 		swiWaitForVBlank();
-		touchRead(&touchXY);
+		enum main_mode mode = select_main_screen_option();
 		
-		// backup
-		if ((touchXY.py > 8*0) && (touchXY.py < 8*8)) {
+		if (mode == Backup) {
 			hwBackupFTP(true);
 		}
 		
-		// restore
-		if ((touchXY.py > 8*8) && (touchXY.py < 8*16)) {
+		if (mode == Restore) {
 			hwRestoreFTP(true);
 		}
 		
-		// erase
-		if ((touchXY.py > 8*16) && (touchXY.py < 8*24)) {
+		if (mode == Erase) {
 			displayPrintUpper();
 			hwErase();
 			displayWarning2F(STR_HW_DID_DELETE);
