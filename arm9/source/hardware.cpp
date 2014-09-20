@@ -61,7 +61,7 @@ static u32 pitch = 0x40000;
 u8 log2trunc(u32 size0)
 {	
 	u8 size = 1;
-	while (size0 > (1 << size)) {
+	while (size0 > (u32)(1 << size)) {
 		size++;
 	}
 	return size;
@@ -308,7 +308,7 @@ void hwBackupDSi()
 	if (!fname[0]) {
 		char *gamename = (char*)0x080000a0;
 		uint32 cnt = 0;
-		sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
+		sprintf(fname, "/%.12s.%lu.sav", gamename, cnt);
 		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
 		while (fileExists(fname)) {
 			if (cnt < 65536)
@@ -317,7 +317,7 @@ void hwBackupDSi()
 				displayWarning2F(STR_ERR_NO_FNAME);
 				while(1);
 			}
-			sprintf(fname, "%s.%i.sav", gamename, cnt);
+			sprintf(fname, "%s.%lu.sav", gamename, cnt);
 		}
 	}
 	char fullpath[256];
@@ -492,7 +492,7 @@ void hwDump3in1(uint32 size, const char *gamename)
 	// look for an unused filename
 	if (!fname[0]) {
 		uint32 cnt = 0;
-		sprintf(fname, "/%s.%i.sav", gamename, cnt);
+		sprintf(fname, "/%s.%lu.sav", gamename, cnt);
 		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
 		while (fileExists(fname)) {
 			if (cnt < 65536)
@@ -501,7 +501,7 @@ void hwDump3in1(uint32 size, const char *gamename)
 				displayWarning2F(STR_ERR_NO_FNAME);
 				while(1);
 			}
-			sprintf(fname, "%s.%i.sav", gamename, cnt);
+			sprintf(fname, "%s.%lu.sav", gamename, cnt);
 		}
 	}
 	char fullpath[256];
@@ -666,7 +666,7 @@ void hwBackupSlot2()
 		sNDSHeader nds;
 		cardReadHeader((u8*)&nds);
 		uint32 cnt = 0;
-		sprintf(fname, "/%.12s.%i.sav", nds.gameTitle, cnt);
+		sprintf(fname, "/%.12s.%lu.sav", nds.gameTitle, cnt);
 		sprintf(fullpath, "%s/%s", path, fname);
 		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
 		while (fileExists(fullpath)) {
@@ -676,7 +676,7 @@ void hwBackupSlot2()
 				displayWarning2F(STR_ERR_NO_FNAME);
 				while(1);
 			}
-			sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
+			sprintf(fname, "%.12s.%lu.sav", nds.gameTitle, cnt);
 			sprintf(fullpath, "%s/%s", path, fname);
 		}
 	}
@@ -831,7 +831,7 @@ void hwBackupFTP(bool dlp)
 		cardReadHeader((u8*)&nds);
 		uint32 cnt = 0;
 		int tsize = 0;
-		sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
+		sprintf(fname, "%.12s.%lu.sav", nds.gameTitle, cnt);
 		while (FtpSize(fname, &tsize, FTPLIB_IMAGE, buf) != 0) {
 			displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
 			if (cnt < 65536)
@@ -840,7 +840,7 @@ void hwBackupFTP(bool dlp)
 				displayWarning2F(STR_ERR_NO_FNAME);
 				while(1);
 			}
-			sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
+			sprintf(fname, "%.12s.%lu.sav", nds.gameTitle, cnt);
 		}
 	}
 	displayMessage2F(STR_HW_WRITE_FILE, fname);
@@ -1009,7 +1009,7 @@ void hwBackupGBA(u8 type)
 	// look for an unused filename
 	if (!fname[0]) {
 		uint32 cnt = 0;
-		sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
+		sprintf(fname, "/%.12s.%lu.sav", gamename, cnt);
 		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
 		while (fileExists(fname)) {
 			if (cnt < 65536)
@@ -1018,7 +1018,7 @@ void hwBackupGBA(u8 type)
 				displayWarning2F(STR_ERR_NO_FNAME);
 				while(1);
 			}
-			sprintf(fname, "/%.12s.%i.sav", gamename, cnt);
+			sprintf(fname, "/%.12s.%lu.sav", gamename, cnt);
 		}
 	}
 	char fullpath[512];

@@ -49,7 +49,7 @@ char **message_strings;
 void AddString(uint32 id, ini_fd_t ini)
 {
 	// first, try to read string from ini file
-	sprintf(txt, "%i", id);
+	sprintf(txt, "%lu", id);
 	bool found = false;
 	if (ini) {
 		if (ini_locateKey(ini, txt) == 0) {

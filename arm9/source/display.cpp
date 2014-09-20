@@ -144,7 +144,7 @@ void displayPrintUpper(bool fc)
 	iprintf("%s", name);
 	// 0.5) memory buffer size
 	consoleSetWindow(&upperScreen, 10, 1, 20, 1);
-	iprintf("%i kB", size_buf >> 10);
+	iprintf("%lu kB", size_buf >> 10);
 	
 	// 1) The cart id.
 	consoleSetWindow(&upperScreen, 10, 3, 22, 1);
@@ -193,7 +193,7 @@ void displayPrintUpper(bool fc)
 			break;
 		case 3:
 			if (size == 0)
-				sprintf(&name[0], "Flash (ID:%x)", auxspi_save_jedec_id(slot_1_type));
+				sprintf(&name[0], "Flash (ID:%lx)", auxspi_save_jedec_id(slot_1_type));
 			else
 				sprintf(&name[0], "Flash (%i kB)", 1 << (size - 10));
 			break;
