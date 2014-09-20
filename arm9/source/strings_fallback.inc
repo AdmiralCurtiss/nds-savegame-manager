@@ -75,5 +75,6 @@ const char *strings_fallback[STR_LAST] = {
 	//
 	/* STR_FS_READ */ "Please select a .sav file\n    (A) Select\n    (B) One directory up\n",
 	/* STR_FS_WRITE */ "Please select a .sav file\n    (A) Select\n    (B) One directory up\n    (L+R) cancel (new file)",
+	//
 	/* STR_MM_WIPE */ "\n    WIPES OUT ALL SAVE DATA\n         ON YOUR GAME !",
 };

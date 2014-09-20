@@ -43,8 +43,8 @@ enum {
 	//
 	// swap card messages (6-9)
 	STR_HW_SWAP_CARD,
-	STR_HW_WRONG_GAME,
 	STR_HW_CARD_UNREADABLE,
+	STR_HW_WRONG_GAME,
 	STR_HW_PLEASE_REBOOT,
 	//
 	// file select messages (10-13)
@@ -87,6 +87,7 @@ enum {
 	// more messages for the file select widget (37-38)
 	STR_FS_READ,
 	STR_FS_WRITE,
+	//
 	// messages for the main menu (39)
 	STR_MM_WIPE,
 	//

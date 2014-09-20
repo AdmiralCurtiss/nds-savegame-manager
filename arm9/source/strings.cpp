@@ -133,7 +133,6 @@ bool stringsLoadFile(const char *fname)
 	AddString(STR_EMPTY, ini);
 	AddString(STR_STR, ini);
 	//
-	AddString(STR_MM_WIPE, ini);
 	AddString(STR_TITLE_MSG, ini);
 	AddString(STR_BOOT_NO_INI, ini);
 	AddString(STR_BOOT_MODE_UNSUPPORTED, ini);
@@ -179,6 +178,7 @@ bool stringsLoadFile(const char *fname)
 	AddString(STR_FS_READ, ini);
 	AddString(STR_FS_WRITE, ini);
 	//
+	AddString(STR_MM_WIPE, ini);
 
 	// delete temp file (which is a remnant of inilib)
 	remove("/tmpfile");
