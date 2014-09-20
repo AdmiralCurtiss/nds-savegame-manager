@@ -630,6 +630,7 @@ void hwBackupSlot2()
 	displayMessageF(STR_HW_SELECT_FILE_OW);
 	char path[256];
 	char fname[256] = "";
+	char fullpath[256];
 	fileSelect("/", path, fname, 0, true, false);
 	
 	// look for an unused filename
@@ -638,8 +639,9 @@ void hwBackupSlot2()
 		cardReadHeader((u8*)&nds);
 		uint32 cnt = 0;
 		sprintf(fname, "/%.12s.%i.sav", nds.gameTitle, cnt);
+		sprintf(fullpath, "%s/%s", path, fname);
 		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
-		while (fileExists(fname)) {
+		while (fileExists(fullpath)) {
 			if (cnt < 65536)
 				cnt++;
 			else {
@@ -647,9 +649,9 @@ void hwBackupSlot2()
 				while(1);
 			}
 			sprintf(fname, "%.12s.%i.sav", nds.gameTitle, cnt);
+			sprintf(fullpath, "%s/%s", path, fname);
 		}
 	}
-	char fullpath[256];
 	sprintf(fullpath, "%s/%s", path, fname);
 	displayMessage2F(STR_HW_WRITE_FILE, fullpath);
 	
