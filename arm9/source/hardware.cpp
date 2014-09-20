@@ -67,6 +67,34 @@ u8 log2trunc(u32 size0)
 	return size;
 }
 
+bool game_header_looks_okay(sNDSHeader* header)
+{
+	for ( int i = 0; i < 4; ++i ) {
+		// gameCode must be all uppercase or digits
+		if ( !( ( header->gameCode[i] >= '0' && header->gameCode[i] <= '9' )
+		     || ( header->gameCode[i] >= 'A' && header->gameCode[i] <= 'Z' ) ) ) {
+			return false;
+		}
+	}
+	
+	// gameTitle may not be empty
+	if ( header->gameTitle[0] == 0 ) {
+		return false;
+	}
+	
+	for ( int i = 0; i < 12; ++i ) {
+		// gameTitle must be in ASCII range, until the first NULL
+		if ( header->gameTitle[i] == 0 ) {
+			break;
+		}
+		if ( !( header->gameTitle[i] >= 0x20 && header->gameTitle[i] < 0x80 ) ) {
+			return false;
+		}
+	}
+	
+	return true;
+}
+
 // ---------------------------------------------------------------------
 bool swap_cart()
 {
@@ -92,7 +120,7 @@ bool swap_cart()
 				// this will break DLDI on the Cyclops Evolution, but we need it anyway.
 				cardReadHeader((u8*)&nds);
 				displayPrintUpper();
-				if (!nds.gameTitle[0]) {
+				if ( !game_header_looks_okay( &nds ) ) {
 					displayMessage2F(STR_HW_CARD_UNREADABLE);
 					continue;
 				}
