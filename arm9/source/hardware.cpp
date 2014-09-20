@@ -78,7 +78,10 @@ bool swap_cart()
 
 		bool swap = false;
 		while (!swap) {
-			if (keysCurrent() & KEY_A) {
+			swiWaitForVBlank();
+			scanKeys();
+			uint32 keys = keysDown();
+			if (keys & KEY_A) {
 				// identify hardware
 				slot_1_type = auxspi_has_extra();
 				// don't try to dump a flash card
