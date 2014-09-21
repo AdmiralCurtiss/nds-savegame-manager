@@ -96,7 +96,7 @@ bool game_header_looks_okay(sNDSHeader* header)
 }
 
 // ---------------------------------------------------------------------
-bool swap_cart()
+bool swap_cart(bool allow_cancel)
 {
 	sNDSHeader nds;
 	nds.gameTitle[0] = 0;
@@ -126,6 +126,9 @@ bool swap_cart()
 				}
 				
 				return true;
+			}
+			if (allow_cancel && (keys & KEY_B)) {
+				return false;
 			}
 		}
 	}
@@ -648,7 +651,9 @@ void hwBackupSlot2()
 {
 	u32 size_blocks = 0;
 	
-	swap_cart();
+	if ( !swap_cart(true) ) {
+		return;
+	}
 	displayPrintUpper();
 
 	uint32 size = auxspi_save_size_log_2(slot_1_type);
@@ -704,7 +709,9 @@ void hwBackupSlot2()
 void hwRestoreSlot2()
 {
 	// First, swap in a new game
-	swap_cart();
+	if ( !swap_cart(true) ) {
+		return;
+	}
 	uint32 size = auxspi_save_size_log_2(slot_1_type);
 	uint8 type = auxspi_save_type(slot_1_type);
 	displayPrintUpper();
