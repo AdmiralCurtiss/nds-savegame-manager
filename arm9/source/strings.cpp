@@ -139,6 +139,7 @@ bool stringsLoadFile(const char *fname)
 	AddString(STR_BOOT_DLDI_ERROR, ini);
 	//
 	AddString(STR_HW_SWAP_CARD, ini);
+	AddString(STR_HW_SWAP_CARD_CANCEL, ini);
 	AddString(STR_HW_CARD_UNREADABLE, ini);
 	AddString(STR_HW_WRONG_GAME, ini);
 	AddString(STR_HW_PLEASE_REBOOT, ini);

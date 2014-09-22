@@ -102,8 +102,12 @@ bool swap_cart(bool allow_cancel)
 	nds.gameTitle[0] = 0;
 	
 	while (!nds.gameTitle[0]) {
-		displayMessage2F(STR_HW_SWAP_CARD);
-
+		if ( allow_cancel ) {
+			displayMessage2F(STR_HW_SWAP_CARD_CANCEL);
+		} else {
+			displayMessage2F(STR_HW_SWAP_CARD);
+		}
+		
 		bool swap = false;
 		while (!swap) {
 			swiWaitForVBlank();

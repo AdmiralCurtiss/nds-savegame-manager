@@ -37,6 +37,7 @@ const char *strings_fallback[STR_LAST] = {
 	/* STR_BOOT_DLDI_ERROR */ "DLDI initialisation error!",
 	//
 	/* STR_HW_SWAP_CARD */ "Please take out Slot 1 flash card and insert a game.\nPress A when done.",
+	/* STR_HW_SWAP_CARD_CANCEL */ "Please take out Slot 1 flash card and insert a game.\nPress A when done.\nPress B to cancel.",
 	/* STR_HW_CARD_UNREADABLE */ "Can't read the game inserted in slot 1.\nPlease eject and reinsert game.\nPress A when done.",
 	/* STR_HW_WRONG_GAME */ "This game has a save chip that is bigger than the save you are going to write. Please insert a different game.\nPress A when done.",
 	/* STR_HW_PLEASE_REBOOT */ "Done! Please power off\n(and restart if you want to do more).",
