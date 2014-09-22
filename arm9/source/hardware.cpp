@@ -95,6 +95,26 @@ bool game_header_looks_okay(sNDSHeader* header)
 	return true;
 }
 
+void find_unused_filename(const char* gamename, const char* path, char* fname)
+{
+	char fullpath[256];
+	uint32 cnt = 0;
+	
+	sprintf(fname, "%s.%lu.sav", gamename, cnt);
+	sprintf(fullpath, "%s/%s", path, fname);
+	displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
+	while (fileExists(fullpath)) {
+		if (cnt < 65536) {
+			cnt++;
+		} else {
+			displayWarning2F(STR_ERR_NO_FNAME);
+			while(1);
+		}
+		sprintf(fname, "%s.%lu.sav", gamename, cnt);
+		sprintf(fullpath, "%s/%s", path, fname);
+	}
+}
+
 // ---------------------------------------------------------------------
 bool swap_cart(bool allow_cancel)
 {
@@ -313,21 +333,8 @@ void hwBackupDSi()
 	char fname[256] = "";
 	fileSelect("sd:/", path, fname, 0, true, false);
 	
-	// look for an unused filename
 	if (!fname[0]) {
-		char *gamename = (char*)0x080000a0;
-		uint32 cnt = 0;
-		sprintf(fname, "/%.12s.%lu.sav", gamename, cnt);
-		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
-		while (fileExists(fname)) {
-			if (cnt < 65536)
-				cnt++;
-			else {
-				displayWarning2F(STR_ERR_NO_FNAME);
-				while(1);
-			}
-			sprintf(fname, "%s.%lu.sav", gamename, cnt);
-		}
+		find_unused_filename((char*)0x080000a0, path, fname);
 	}
 	char fullpath[256];
 	sprintf(fullpath, "%s/%s", path, fname);
@@ -502,20 +509,8 @@ void hwDump3in1(uint32 size, const char *gamename)
 	char fname[256] = "";
 	fileSelect("/", path, fname, 0, true, false);
 	
-	// look for an unused filename
 	if (!fname[0]) {
-		uint32 cnt = 0;
-		sprintf(fname, "/%s.%lu.sav", gamename, cnt);
-		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
-		while (fileExists(fname)) {
-			if (cnt < 65536)
-				cnt++;
-			else {
-				displayWarning2F(STR_ERR_NO_FNAME);
-				while(1);
-			}
-			sprintf(fname, "%s.%lu.sav", gamename, cnt);
-		}
+		find_unused_filename(gamename, path, fname);
 	}
 	char fullpath[256];
 	sprintf(fullpath, "%s/%s", path, fname);
@@ -673,28 +668,14 @@ void hwBackupSlot2()
 	displayMessageF(STR_HW_SELECT_FILE_OW);
 	char path[256];
 	char fname[256] = "";
-	char fullpath[256];
 	fileSelect("/", path, fname, 0, true, false);
 	
-	// look for an unused filename
 	if (!fname[0]) {
 		sNDSHeader nds;
 		cardReadHeader((u8*)&nds);
-		uint32 cnt = 0;
-		sprintf(fname, "/%.12s.%lu.sav", nds.gameTitle, cnt);
-		sprintf(fullpath, "%s/%s", path, fname);
-		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
-		while (fileExists(fullpath)) {
-			if (cnt < 65536)
-				cnt++;
-			else {
-				displayWarning2F(STR_ERR_NO_FNAME);
-				while(1);
-			}
-			sprintf(fname, "%.12s.%lu.sav", nds.gameTitle, cnt);
-			sprintf(fullpath, "%s/%s", path, fname);
-		}
+		find_unused_filename(nds.gameTitle, path, fname);
 	}
+	char fullpath[256];
 	sprintf(fullpath, "%s/%s", path, fname);
 	displayMessage2F(STR_HW_WRITE_FILE, fullpath);
 	
@@ -1024,22 +1005,10 @@ void hwBackupGBA(u8 type)
 	
 	char path[256];
 	char fname[256] = "";
-	char *gamename = (char*)0x080000a0;
 	fileSelect("/", path, fname, 0, true, false);
-	// look for an unused filename
+	
 	if (!fname[0]) {
-		uint32 cnt = 0;
-		sprintf(fname, "/%.12s.%lu.sav", gamename, cnt);
-		displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
-		while (fileExists(fname)) {
-			if (cnt < 65536)
-				cnt++;
-			else {
-				displayWarning2F(STR_ERR_NO_FNAME);
-				while(1);
-			}
-			sprintf(fname, "/%.12s.%lu.sav", gamename, cnt);
-		}
+		find_unused_filename((char*)0x080000a0, path, fname);
 	}
 	char fullpath[512];
 	sprintf(fullpath, "%s/%s", path, fname);
