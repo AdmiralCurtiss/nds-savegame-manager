@@ -292,7 +292,9 @@ void hwBackupDSi()
 
 #ifdef SLOT_1_UNLOCKED
 	// swap game
-	swap_cart();
+	if ( !swap_cart(true) ) {
+		return;
+	}
 	displayPrintUpper();
 #endif
 
@@ -353,7 +355,9 @@ void hwRestoreDSi()
 	
 #ifdef SLOT_1_UNLOCKED
 	// swap game
-	swap_cart();
+	if ( !swap_cart(true) ) {
+		return;
+	}
 	displayPrintUpper();
 #endif
 
@@ -413,7 +417,9 @@ void hwRestoreDSi()
 // --------------------------------------------------------
 void hwBackup3in1()
 {
-	swap_cart();
+	if ( !swap_cart(true) ) {
+		return;
+	}
 	displayPrintUpper();
 
 	uint8 size = auxspi_save_size_log_2(slot_1_type);
@@ -812,8 +818,11 @@ void hwBackupFTP(bool dlp)
 
 	// Dump save and write it to FTP server
 	// First: swap card
-	if (!dlp)
-		swap_cart();
+	if (!dlp) {
+		if ( !swap_cart(true) ) {
+			return;
+		}
+	}
 	displayPrintUpper();
 	uint8 size = auxspi_save_size_log_2(slot_1_type);
 	uint8 type = auxspi_save_type(slot_1_type);

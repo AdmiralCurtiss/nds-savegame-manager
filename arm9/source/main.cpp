@@ -138,9 +138,10 @@ void mode_dsi()
 		}
 		
 		if (mode == Erase) {
-			//swap_cart();
-			//displayPrintUpper();
-			//hwErase();
+			//if ( swap_cart(true) ) {
+			//	displayPrintUpper();
+			//	hwErase();
+			//}
 		}
 	}
 }
@@ -166,9 +167,10 @@ void mode_slot2()
 		}
 		
 		if (mode == Erase) {
-			swap_cart();
-			displayPrintUpper();
-			hwErase();
+			if ( swap_cart(true) ) {
+				displayPrintUpper();
+				hwErase();
+			}
 		}
 	}
 }
@@ -209,9 +211,10 @@ void mode_3in1()
 		}
 		
 		if (mode == Erase) {
-			swap_cart();
-			displayPrintUpper();
-			hwErase();
+			if ( swap_cart(true) ) {
+				displayPrintUpper();
+				hwErase();
+			}
 		}
 	}
 }
@@ -278,9 +281,10 @@ void mode_wifi()
 		}
 		
 		if (mode == Erase) {
-			swap_cart();
-			displayPrintUpper();
-			hwErase();
+			if ( swap_cart(true) ) {
+				displayPrintUpper();
+				hwErase();
+			}
 		}
 	}
 }
