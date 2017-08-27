@@ -220,10 +220,10 @@ void fileSelect(const char *startdir, char *out_dir, char *out_fname, netbuf *bu
 			char c;
 			sscanf(buf2, "%c%[^\n]", &c, fname); // gets 'd' or 'f' - dir or file			
 			// special cases
-			if (stricmp(fname, ".") == 0)
+			if (strcasecmp(fname, ".") == 0)
 				// don't do anything
 				continue;
-			if (stricmp(fname, "..") == 0) {
+			if (strcasecmp(fname, "..") == 0) {
 				// return to parent function (usually results in "back to higher level")
 				while (keysCurrent() & (KEY_A | KEY_B));
 				if (!allow_up)

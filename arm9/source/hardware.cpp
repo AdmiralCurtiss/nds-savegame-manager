@@ -172,49 +172,49 @@ bool hwDetectSlot2DLDI()
 	// The driver name is stored in io_dldi_data->friendlyName
 	
 	// EZ Flash 4
-	if (!strnicmp(io_dldi_data->friendlyName, "EZ Flash 4", 10))
+	if (!strncasecmp(io_dldi_data->friendlyName, "EZ Flash 4", 10))
 		return true;
 
 	// CycloDS (Slot 2)
-	if (!strnicmp(io_dldi_data->friendlyName, "CycloDS", 7)
-		&& strnicmp(io_dldi_data->friendlyName, "CycloDS Evolution", 17)
-		&& strnicmp(io_dldi_data->friendlyName, "CycloDS iEvolution", 18))
+	if (!strncasecmp(io_dldi_data->friendlyName, "CycloDS", 7)
+		&& strncasecmp(io_dldi_data->friendlyName, "CycloDS Evolution", 17)
+		&& strncasecmp(io_dldi_data->friendlyName, "CycloDS iEvolution", 18))
 		return true;
 
 	// Ewin2
-	if (!strnicmp(io_dldi_data->friendlyName, "Ewin2", 5))
+	if (!strncasecmp(io_dldi_data->friendlyName, "Ewin2", 5))
 		return true;
 
 	// G6 Lite
-	if (!strnicmp(io_dldi_data->friendlyName, "G6 Lite DLDI", 12))
+	if (!strncasecmp(io_dldi_data->friendlyName, "G6 Lite DLDI", 12))
 		return true;
 
 	// GBA Movie Player (CF and SD versions)
-	if (!strnicmp(io_dldi_data->friendlyName, "GBA Movie Player", 16))
+	if (!strncasecmp(io_dldi_data->friendlyName, "GBA Movie Player", 16))
 		return true;
 
 	// M3 (CF and SD versions)
-	if (!strnicmp(io_dldi_data->friendlyName, "M3 Adapter", 10))
+	if (!strncasecmp(io_dldi_data->friendlyName, "M3 Adapter", 10))
 		return true;
 	
 	// Max Media Dock
-	if (!strnicmp(io_dldi_data->friendlyName, "Max Media Dock", 14))
+	if (!strncasecmp(io_dldi_data->friendlyName, "Max Media Dock", 14))
 		return true;
 	
 	// Neo2
-	if (!strnicmp(io_dldi_data->friendlyName, "Neo2", 4))
+	if (!strncasecmp(io_dldi_data->friendlyName, "Neo2", 4))
 		return true;
 	
 	// Supercard (CF/SD)
-	if (!strnicmp(io_dldi_data->friendlyName, "SuperCard (", 11))
+	if (!strncasecmp(io_dldi_data->friendlyName, "SuperCard (", 11))
 		return true;
 	
 	// Supercard (lite)
-	if (!strnicmp(io_dldi_data->friendlyName, "SuperCard Lite", 14))
+	if (!strncasecmp(io_dldi_data->friendlyName, "SuperCard Lite", 14))
 		return true;
 	
 	// Supercard (Rumble)
-	if (!strnicmp(io_dldi_data->friendlyName, "SuperCard Rumble", 16))
+	if (!strncasecmp(io_dldi_data->friendlyName, "SuperCard Rumble", 16))
 		return true;
 	
 	return false;

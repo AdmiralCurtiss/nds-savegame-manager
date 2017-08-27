@@ -31,7 +31,7 @@
 
 bool isDsi()
 {
-	return (REG_DSIMODE != 0) ? true : false;
+	return isDSiMode();
 }
 
 bool dsiUnlockSlot1()
