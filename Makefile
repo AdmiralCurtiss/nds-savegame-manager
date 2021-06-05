@@ -7,8 +7,10 @@ endif
 
 include $(DEVKITARM)/ds_rules
 
-export TARGET		:=	savegame_manager
+export TARGET		:=	ereader-manager
 export TOPDIR		:=	$(CURDIR)
+export GAME_TITLE	:=	e-Reader Manager
+export GAME_ICON	:=	$(CURDIR)/icon.bmp
 
 
 .PHONY: arm7/$(TARGET).elf arm9/$(TARGET).elf
@@ -22,7 +24,7 @@ debug: $(TARGET)-debug.nds
 
 #---------------------------------------------------------------------------------
 $(TARGET).nds	:	arm7/$(TARGET).elf arm9/$(TARGET).elf
-	ndstool	-c $(TARGET).nds -7 arm7/$(TARGET).elf -9 arm9/$(TARGET).elf
+	ndstool -7 arm7/$(TARGET).elf -9 arm9/$(TARGET).elf -b $(GAME_ICON) "$(GAME_TITLE);$(GAME_SUBTITLE1);$(GAME_SUBTITLE2)" -c $(TARGET).nds 
 
 #---------------------------------------------------------------------------------
 arm7/$(TARGET).elf:

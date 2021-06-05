@@ -39,6 +39,7 @@ extern bool flash_card;
 struct dsCardData
 {
 	uint32 data[4];
+	uint32 rawdata[4];
 	char name[12];
 };
 
@@ -74,7 +75,7 @@ void hwRestoreFTP(bool dlp = false);
 
 void hwBackupGBA(u8 type);
 void hwRestoreGBA();
-void hwEraseGBA();
+void hwEraseGBA(u8 type);
 
 void hwBackupSlot2();
 void hwRestoreSlot2();

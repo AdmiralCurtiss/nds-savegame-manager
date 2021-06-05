@@ -145,6 +145,7 @@ bool stringsLoadFile(const char *fname)
 	AddString(STR_HW_PLEASE_REBOOT, ini);
 	//
 	AddString(STR_HW_SELECT_FILE, ini);
+	AddString(STR_HW_SELECT_RAW, ini);
 	AddString(STR_HW_SELECT_FILE_OW, ini);
 	AddString(STR_HW_SEEK_UNUSED_FNAME, ini);
 	AddString(STR_ERR_NO_FNAME, ini);

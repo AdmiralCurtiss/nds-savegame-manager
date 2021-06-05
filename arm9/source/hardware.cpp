@@ -31,13 +31,16 @@
 #include <nds/interrupts.h>
 #include <nds/arm9/console.h>
 #include <sys/dir.h>
+#include <sys/stat.h>
 #include <sys/unistd.h>
 #include <dswifi9.h>
 #include <nds/card.h>
-
+#include <malloc.h>
 #include <stdio.h>
 #include <algorithm>
-
+extern "C" {
+#include "inject.h"
+}
 #include "display.h"
 #include "dsCard.h"
 #include "ftplib.h"
@@ -47,7 +50,7 @@
 #include "hardware.h"
 
 #include "fileselect.h"
-
+#include <string.h>
 #include "auxspi.h"
 #include "strings.h"
 #include "dsi.h"
@@ -58,6 +61,23 @@ static u32 pitch = 0x40000;
 
 
 // ---------------------------------------------------------------------
+const char *get_filename_ext(const char *filename) {
+    const char *dot = strrchr(filename, '.');
+    if(!dot || dot == filename) return "";
+    return dot + 1;
+}
+
+bool dirExists(const char *path)
+{
+	DIR *dir;
+	dir = opendir(path);
+	if(dir)
+	{
+		closedir(dir);
+		return true;
+	}
+	return false;
+}
 u8 log2trunc(u32 size0)
 {	
 	u8 size = 1;
@@ -287,7 +307,7 @@ u32 hwDetect()
 		*/
 	
 	// Nothing unique found, so enter WiFi mode
-	return 0;
+	return 1;
 }
 
 // --------------------------------------------------------
@@ -1028,6 +1048,9 @@ void hwBackupGBA(u8 type)
 
 void hwRestoreGBA()
 {
+	//char *apptitle;
+	char extension[64];
+	
 	u8 type = gbaGetSaveType();
 	if ((type == 0) || (type > 5))
 		return;
@@ -1037,7 +1060,13 @@ void hwRestoreGBA()
 		displayMessageF(STR_STR, "I can't write this save type\nyet. Please use Rudolphs tool\ninstead.");
 		return;
 	}
-	
+	FILE *f = fopen("/ereader/template.sav","rb");
+		if(!f){
+			displayMessage2F(STR_HW_DID_DELETE);
+	while (!(keysCurrent() & (KEY_A))) {};
+		}
+		else{
+			fclose(f);
 	uint32 size = gbaGetSaveSize(type);
 	
 	char path[256];
@@ -1048,8 +1077,50 @@ void hwRestoreGBA()
 
 	displayMessage2F(STR_HW_READ_FILE, fname);
 	FILE *file = fopen(fullpath, "rb");
-	fread(data, 1, size, file);
+	sprintf(extension, get_filename_ext(fullpath));
+	if (strcmp(extension,"bin")!= 0){
+			displayMessage2F(STR_HW_FTP_SEEK_AP);
+	while (!(keysCurrent() & (KEY_A))) {};
 	fclose(file);
+	}
+	else {
+
+			char *apptitle = strrchr(fullpath, '/') + 1;
+						size_t len = strlen(apptitle);
+						if (len >= 4) {
+							apptitle[len-4] = 0;
+						}
+					
+						FILE *titlebin = fopen("/ereader/tempgarfieldtitle.bin", "wb");
+						FILE *garfield = fopen("/ereader/tempgarfieldvpk.bin", "wb");
+						fseek(file, 0, SEEK_END);
+						long vpklength = ftell(file);
+						char *vpkdata =(char*)malloc(vpklength + 1);
+						fseek(file, 0, SEEK_SET);
+						fread(vpkdata, 1, vpklength, file);
+						fwrite(vpkdata, 1, vpklength, garfield);
+						int titlecounter = 0;
+							while (titlecounter < 35) {
+								fputc(0x00, titlebin);
+								titlecounter++;
+							}
+						fseek(titlebin, 0, SEEK_SET);
+						if (strlen(apptitle) > 35) {
+							fwrite(apptitle, 1, 35, titlebin);
+						}
+						else {
+							fwrite(apptitle, 1, strlen(apptitle), titlebin);
+						}
+						fclose(titlebin);
+						fclose(garfield);
+  
+		bin_inject();
+		fclose(file);
+		FILE *injectsav = fopen("/ereader/tempgarfieldinject.sav","rb");
+
+
+	fread(data, 1, size, injectsav);
+	fclose(injectsav);
 	
 	if ((type == 4) || (type == 5)) {
 		displayMessage2F(STR_HW_FORMAT_GAME);
@@ -1060,23 +1131,44 @@ void hwRestoreGBA()
 	gbaWriteSave(0, data, size, type);
 
 	displayStateF(STR_STR, "Done!");
+	remove("/ereader/tempgarfieldinject.sav");
 /*
 	displayMessage2F(STR_HW_PLEASE_REBOOT);
 	while(1);
 	*/
 }
-
-void hwEraseGBA()
+}
+}
+void hwEraseGBA(u8 type)
 {
-	u8 type = gbaGetSaveType();
+
+	displayMessage2F(STR_HW_WARN_DELETE);
+	while (!(keysCurrent() & (KEY_A))) {};
+	
 	if ((type == 0) || (type > 5))
 		return;
 
-	displayMessage2F(STR_HW_WARN_DELETE);
-	while (!(keysCurrent() & (KEY_UP | KEY_R | KEY_Y))) {};
-	gbaFormatSave(type);
-	displayMessage2F(STR_HW_DID_DELETE);
-	while (1);
+	if ((type == 1) || (type == 2)) {
+		// This is not to be translated, it will be removed at some point.
+		displayMessageF(STR_STR, "I can't read this save type\nyet. Please use Rudolphs tool\ninstead.");
+		return;
+	}
+	
+	uint32 size = gbaGetSaveSize(type);
+	gbaReadSave(data, 0, size, type);
+	if(!dirExists("/ereader"))
+	{
+		mkdir("/ereader", S_IREAD | S_IWRITE);
+	}
+	FILE *file = fopen("/ereader/template.sav", "wb");
+	fwrite(data, 1, size, file);
+	fclose(file);
+
+	displayStateF(STR_STR, "Done!");
+	//while(1);
+	
+	//displayMessage2F(STR_HW_DID_DELETE);
+	//while (1);
 
 }
 

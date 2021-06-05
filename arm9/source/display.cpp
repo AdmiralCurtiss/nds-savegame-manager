@@ -77,13 +77,13 @@ void displayPrintUpper(bool fc)
 	consoleSelect(&upperScreen);
 	consoleSetWindow(&upperScreen, 0, 0, 32, 24);
 	consoleClear();
-	iprintf("Mode     :\n");
-	iprintf("Memory   :\n");
-	iprintf("--- SLOT 1 ---------------------");
-	iprintf("Game ID  :\n");
-	iprintf("Game name:\n");
-	iprintf("Game save:\n");
-	iprintf("Special  :\n");
+	iprintf("e-Reader M\n");
+	iprintf("\nBased on DS save manager\n");
+	iprintf("by Pokedoc, with modifications\n");
+	iprintf("by Admiral Curtiss\n");
+	iprintf("CRC Calculator and NEDCLIB\n");
+	iprintf("by CaitSith2\n");
+	//iprintf("Special  :\n");
 	if (dstype == 1) {
 		// DSi mode
 		iprintf("--- SD-SLOT --------------------");
@@ -98,10 +98,10 @@ void displayPrintUpper(bool fc)
 	}
 	
 	// print upper screen
-	consoleSetWindow(&upperScreen, 10, 3, 22, 4);
-	consoleClear();
-	consoleSetWindow(&upperScreen, 10, 8, 22, 4);
-	consoleClear();
+	//consoleSetWindow(&upperScreen, 10, 3, 22, 4);
+	//consoleClear();
+	//consoleSetWindow(&upperScreen, 10, 8, 22, 4);
+	//consoleClear();
 	
 	// fetch cartridge header (maybe, calling "cardReadHeader" on a FC messes with libfat!)
 	sNDSHeader nds;
@@ -118,7 +118,7 @@ void displayPrintUpper(bool fc)
 		sprintf(&name[0], "WiFi/FTP");
 		break;
 	case 1:
-		sprintf(&name[0], "GBA");
+		sprintf(&name[0], "anager by Revvy"); //this is the only way i could get it to display properly because im bad lol
 		break;
 	case 2:
 		sprintf(&name[0], "3in1");
@@ -143,91 +143,91 @@ void displayPrintUpper(bool fc)
 	consoleClear();
 	iprintf("%s", name);
 	// 0.5) memory buffer size
-	consoleSetWindow(&upperScreen, 10, 1, 20, 1);
-	iprintf("%lu kB", size_buf >> 10);
+	//consoleSetWindow(&upperScreen, 10, 1, 20, 1);
+	//iprintf("%lu kB", size_buf >> 10);
 	
 	// 1) The cart id.
-	consoleSetWindow(&upperScreen, 10, 3, 22, 1);
-	sprintf(&name[0], "----");
-	if (slot_1_type == AUXSPI_FLASH_CARD) {
-		sprintf(&name[0], "Flash Card");
-	} else {
-		memcpy(&name[0], &nds.gameCode[0], 4);
-		name[4] = 0x00;
-	}
-	if (dstype == 1)
-		sprintf(name, "LOCKED");
-	consoleClear();
-	iprintf("%s", name);
+	//consoleSetWindow(&upperScreen, 10, 3, 22, 1);
+	//sprintf(&name[0], "----");
+	//if (slot_1_type == AUXSPI_FLASH_CARD) {
+	//	sprintf(&name[0], "Flash Card");
+	//} else {
+	//	memcpy(&name[0], &nds.gameCode[0], 4);
+	//	name[4] = 0x00;
+	//}
+	//if (dstype == 1)
+	//	sprintf(name, "LOCKED");
+	//consoleClear();
+	//iprintf("%s", name);
 
 	// 2) The cart name.
-	consoleSetWindow(&upperScreen, 10, 4, 22, 1);
-	sprintf(&name[0], "----");
-	if (slot_1_type == AUXSPI_FLASH_CARD) {
-		sprintf(&name[0], "Flash Card");
-	} else {
-		memcpy(&name[0], &nds.gameTitle[0], 12);
-		name[12] = 0x00;
-	}
-	if (dstype == 1)
-		sprintf(name, "LOCKED");
-	consoleClear();
-	iprintf("%s", name);
+	//consoleSetWindow(&upperScreen, 10, 4, 22, 1);
+	//sprintf(&name[0], "----");
+	//if (slot_1_type == AUXSPI_FLASH_CARD) {
+	//	sprintf(&name[0], "Flash Card");
+	//} else {
+	//	memcpy(&name[0], &nds.gameTitle[0], 12);
+	//	name[12] = 0x00;
+	//}
+	//if (dstype == 1)
+	//	sprintf(name, "LOCKED");
+	//consoleClear();
+	//iprintf("%s", name);
 
 	// 3) The save type
-	consoleSetWindow(&upperScreen, 10, 5, 22, 1);
-	sprintf(&name[0], "----");
-	if (slot_1_type == AUXSPI_FLASH_CARD) {
-		sprintf(&name[0], "Flash Card");
-	} else {
-		uint8 type = auxspi_save_type(slot_1_type);
-		uint8 size = auxspi_save_size_log_2(slot_1_type);
+	//consoleSetWindow(&upperScreen, 10, 5, 22, 1);
+	//sprintf(&name[0], "----");
+	//if (slot_1_type == AUXSPI_FLASH_CARD) {
+	//	sprintf(&name[0], "Flash Card");
+	//} else {
+	//	uint8 type = auxspi_save_type(slot_1_type);
+	//	uint8 size = auxspi_save_size_log_2(slot_1_type);
 		// some debug output may need this so iprintf prints to the correct region
-		consoleSetWindow(&upperScreen, 10, 5, 22, 1);
-		switch (type) {
-		case 1:
-			sprintf(&name[0], "Eeprom (%i Bytes)", size);
-			break;
-		case 2:
-			sprintf(&name[0], "FRAM (%i kB)", 1 << (size - 10));
-			break;
-		case 3:
-			if (size == 0)
-				sprintf(&name[0], "Flash (ID:%lx)", auxspi_save_jedec_id(slot_1_type));
-			else
-				sprintf(&name[0], "Flash (%i kB)", 1 << (size - 10));
-			break;
-		default:
-			sprintf(&name[0], "???");
-			break;
-		}
-	}
-	if (dstype == 1)
-		sprintf(name, "LOCKED");
-	consoleClear();
-	iprintf("%s", name);
+	//	consoleSetWindow(&upperScreen, 10, 5, 22, 1);
+	//	switch (type) {
+	//	case 1:
+	//		sprintf(&name[0], "Eeprom (%i Bytes)", size);
+	//		break;
+	//	case 2:
+	//		sprintf(&name[0], "FRAM (%i kB)", 1 << (size - 10));
+	//		break;
+	//	case 3:
+	//		if (size == 0)
+	//			sprintf(&name[0], "Flash (ID:%lx)", auxspi_save_jedec_id(slot_1_type));
+	//		else
+	//			sprintf(&name[0], "Flash (%i kB)", 1 << (size - 10));
+	//		break;
+	//	default:
+	//		sprintf(&name[0], "???");
+	//		break;
+	//	}
+	//}
+	//if (dstype == 1)
+	//	sprintf(name, "LOCKED");
+	//consoleClear();
+	//iprintf("%s", name);
 
 	// 4) Special properties (infrared device...)
-	consoleSetWindow(&upperScreen, 10, 6, 22, 1);
-	consoleClear();
-	memset(&name[0], 0, MAXPATHLEN);
-	switch (slot_1_type) {
-		case AUXSPI_INFRARED:
-			sprintf(&name[0], "Infrared");
-			break;
-		case AUXSPI_BBDX:
-			sprintf(name, "XXL");
-			break;
-		case AUXSPI_BLUETOOTH:
-			sprintf(name, "Bluetooth");
-			break;
-		default:
-			sprintf(&name[0], "----");
-	}
-	if (dstype == 1)
-		sprintf(name, "LOCKED");
-	consoleClear();
-	iprintf("%s", name);
+	//consoleSetWindow(&upperScreen, 10, 6, 22, 1);
+	//consoleClear();
+	//memset(&name[0], 0, MAXPATHLEN);
+	//switch (slot_1_type) {
+	//	case AUXSPI_INFRARED:
+	//		sprintf(&name[0], "Infrared");
+	//		break;
+	//	case AUXSPI_BBDX:
+	//		sprintf(name, "XXL");
+	//		break;
+	//	case AUXSPI_BLUETOOTH:
+	//		sprintf(name, "Bluetooth");
+	//		break;
+	//	default:
+	//		sprintf(&name[0], "----");
+	//}
+	//if (dstype == 1)
+	//	sprintf(name, "LOCKED");
+	//consoleClear();
+	//iprintf("%s", name);
 	
 	// Slot 2/SD status
 	if (dstype == 1) {
@@ -360,17 +360,17 @@ void displayPrintLower( int cursor_position )
 
 	consoleSetWindow(&lowerScreen, 1, 9, 30, 6);
 	if ( cursor_position == 1 ) {
-		iprintf("\n\n       ==>  RESTORE  <==\n");
+		iprintf("\n\n       ==>  INJECT  <==\n");
 	} else {
-		iprintf("\n\n            RESTORE\n");
+		iprintf("\n\n            INJECT\n");
 	}
-	iprintf("         .sav -> Game");
+	iprintf("         .raw -> Game\n         .bin -> Game");
 
 	consoleSetWindow(&lowerScreen, 1, 17, 30, 6);
 	if ( cursor_position == 2 ) {
-		iprintf("\n\n        ==>  RESET  <==\n");
+		iprintf("\n\n  ==>  FIRST-TIME SETUP  <==\n");
 	} else {
-		iprintf("\n\n             RESET\n");
+		iprintf("\n\n       FIRST-TIME SETUP\n");
 	}
 	iprintf(stringsGetMessageString(STR_MM_WIPE));
 }

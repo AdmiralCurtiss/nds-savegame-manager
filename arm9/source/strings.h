@@ -48,20 +48,21 @@ enum {
 	STR_HW_WRONG_GAME,
 	STR_HW_PLEASE_REBOOT,
 	//
-	// file select messages (10-13)
+	// file select messages (10-14)
 	STR_HW_SELECT_FILE,
+	STR_HW_SELECT_RAW,
 	STR_HW_SELECT_FILE_OW,
 	STR_HW_SEEK_UNUSED_FNAME,
 	STR_ERR_NO_FNAME,
 	//
-	// shared messages messages (14-18)
+	// shared messages messages (15-19)
 	STR_HW_FORMAT_GAME,
 	STR_HW_WRITE_GAME,
 	STR_HW_READ_GAME,
 	STR_HW_WRITE_FILE,
 	STR_HW_READ_FILE,
 	//
-	// 3in1 messages (19-25)
+	// 3in1 messages (20-26)
 	STR_HW_3IN1_FORMAT_NOR,
 	STR_HW_3IN1_PREPARE_REBOOT,
 	STR_HW_3IN1_PLEASE_REBOOT,
@@ -70,7 +71,7 @@ enum {
 	STR_HW_3IN1_ERR_IDMODE,
 	STR_HW_3IN1_ERR_NOR,
 	//
-	// FTP specific messages (26-3)
+	// FTP specific messages (27-35)
 	STR_HW_FTP_SEEK_AP,
 	STR_HW_FTP_ERR_AP,
 	STR_HW_FTP_SEEK_FTP,
@@ -81,15 +82,15 @@ enum {
 	STR_HW_FTP_SLOW,
 	STR_HW_FTP_READ_ONLY,
 	//
-	// delete messages (35-36)
+	// delete messages (36-37)
 	STR_HW_WARN_DELETE,
 	STR_HW_DID_DELETE,
 	//
-	// more messages for the file select widget (37-38)
+	// more messages for the file select widget (38-39)
 	STR_FS_READ,
 	STR_FS_WRITE,
 	//
-	// messages for the main menu (39)
+	// messages for the main menu (40)
 	STR_MM_WIPE,
 	//
 	STR_LAST

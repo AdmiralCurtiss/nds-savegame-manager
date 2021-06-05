@@ -46,7 +46,8 @@
 #include "hardware.h"
 #include "fileselect.h"
 #include "strings.h"
-
+#include "crc.h"
+#include "inject.h"
 #include "libini.h"
 
 #include "globals.h"
@@ -248,7 +249,7 @@ void mode_gba()
 		
 		if (mode == Erase) {
 			displayPrintUpper();
-			hwEraseGBA();
+			hwEraseGBA(gbatype);
 		}
 	}
 }
