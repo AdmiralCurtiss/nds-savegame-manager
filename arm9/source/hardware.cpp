@@ -873,8 +873,11 @@ void hwBackupFTP(bool dlp)
 				displayMessage2F(STR_HW_WRITE_FILE, fname);
 			}
 		}
-	}	
+	}
+	displayMessage2F(STR_HW_FTP_TRANSFER_COMPLETE);
+	
 	FtpClose(ndata);
+	displayMessage2F(STR_HW_FTP_CLOSE);
 	
 	//Wifi_DisconnectAP();
 
@@ -980,7 +983,10 @@ void hwRestoreFTP(bool dlp)
 		displayMessageF(STR_STR, ctr);
 		hwRestoreFTPPartial(i << len_block, len_block, type, ndata);
 	}
+	displayMessage2F(STR_HW_FTP_TRANSFER_COMPLETE);
+	
 	FtpClose(ndata);
+	displayMessage2F(STR_HW_FTP_CLOSE);
 
 	//Wifi_DisconnectAP();
 

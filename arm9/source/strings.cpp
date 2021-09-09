@@ -171,7 +171,9 @@ bool stringsLoadFile(const char *fname)
 	AddString(STR_HW_FTP_ERR_LOGIN, ini);
 	AddString(STR_HW_FTP_DIR, ini);
 	AddString(STR_HW_FTP_SLOW, ini);
-	AddString(STR_HW_FTP_READ_ONLY, ini);
+	AddString(STR_HW_FTP_READ_ONLY, ini);	
+	AddString(STR_HW_FTP_TRANSFER_COMPLETE, ini);	
+	AddString(STR_HW_FTP_CLOSE, ini);
 	//
 	AddString(STR_HW_WARN_DELETE, ini);
 	AddString(STR_HW_DID_DELETE, ini);

@@ -70,6 +70,8 @@ const char *strings_fallback[STR_LAST] = {
 	/* STR_HW_FTP_DIR */ "Reading FTP directory...",
 	/* STR_HW_FTP_SLOW */ "FTP is slow, please wait...",
 	/* STR_HW_FTP_READ_ONLY */ "WARNING:\nCould not write to your FTP server! Maybe you forgot to enable write access?",
+	/* STR_HW_FTP_TRANSFER_COMPLETE */ "File transfer complete.",
+	/* STR_HW_FTP_CLOSE */ "FTP connection closed.",
 	//
 	/* STR_HW_WARN_DELETE */ "This will WIPE OUT your entire save! ARE YOU SURE?\n\nPress R+up+Y to confim!",
 	/* STR_HW_DID_DELETE */ "Done. Your game save has been PERMANENTLY deleted.\n\nPlease restart your DS.",
