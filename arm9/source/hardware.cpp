@@ -119,10 +119,10 @@ void find_unused_filename(const char* gamename, const char* path, char* fname)
 // ---------------------------------------------------------------------
 bool swap_cart(bool allow_cancel)
 {
-	sNDSHeader nds;
-	nds.gameTitle[0] = 0;
-	
-	while (!nds.gameTitle[0]) {
+	u8 header[512] = {0};
+	sNDSHeader* nds = (sNDSHeader*)header;
+		
+	while (!nds->gameTitle[0]) {
 		if ( allow_cancel ) {
 			displayMessage2F(STR_HW_SWAP_CARD_CANCEL);
 		} else {
@@ -143,9 +143,9 @@ bool swap_cart(bool allow_cancel)
 
 				sysSetBusOwners(true, true);
 				// this will break DLDI on the Cyclops Evolution, but we need it anyway.
-				cardReadHeader((u8*)&nds);
+				cardReadHeader(header);
 				displayPrintUpper();
-				if ( !game_header_looks_okay( &nds ) ) {
+				if ( !game_header_looks_okay( nds ) ) {
 					displayMessage2F(STR_HW_CARD_UNREADABLE);
 					continue;
 				}
@@ -478,8 +478,9 @@ void hwBackup3in1()
 	// Fix for dead batteries: don't write "reboot" values to SRAM, but to NOR.
 	displayMessage2F(STR_HW_3IN1_PREPARE_REBOOT);
 	//
-	sNDSHeader nds;
-	cardReadHeader((u8*)&nds); // on a Cyclops Evolution, this call *will* mess up your DLDI driver!
+	u8 header[512] = {0};
+	sNDSHeader* nds = (sNDSHeader*)header;
+	cardReadHeader(header); // on a Cyclops Evolution, this call *will* mess up your DLDI driver!	
 	dsCardData data2;
 	memset(&data2, 0, sizeof(data2));
 	data2.data[0] = RS_BACKUP;
@@ -488,7 +489,7 @@ void hwBackup3in1()
 	data2.data[3] = 0xffff00ff;
 	// We need to write the reboot flags to NOR, and we can only write in 32kB-blocks, at aligned offsets.
 	// Therefore we prepare a bigger block and copy lots of data now.
-	memcpy(&data2.name[0], &nds.gameTitle[0], 12);
+	memcpy(&data2.name[0], &nds->gameTitle[0], 12);
 	memset(data, 0, 0x8000);
 	memcpy(&data[0x1000], (u8*)&data2, sizeof(data2));
 	uint32 ime = hwGrab3in1();
@@ -672,9 +673,10 @@ void hwBackupSlot2()
 	fileSelect("/", path, fname, 0, true, false);
 	
 	if (!fname[0]) {
-		sNDSHeader nds;
-		cardReadHeader((u8*)&nds);
-		find_unused_filename(nds.gameTitle, path, fname);
+		u8 header[512] = {0};
+		sNDSHeader* nds = (sNDSHeader*)header;
+		cardReadHeader(header);
+		find_unused_filename(nds->gameTitle, path, fname);
 	}
 	char fullpath[256];
 	sprintf(fullpath, "%s/%s", path, fname);
@@ -829,11 +831,12 @@ void hwBackupFTP(bool dlp)
 	// Third: get a new target filename
 	FtpChdir(fdir, buf);
 	if (!fname[0]) {
-		sNDSHeader nds;
-		cardReadHeader((u8*)&nds);
+		u8 header[512] = {0};
+		sNDSHeader* nds = (sNDSHeader*)header;
+		cardReadHeader(header);
 		uint32 cnt = 0;
 		int tsize = 0;
-		sprintf(fname, "%.12s.%lu.sav", nds.gameTitle, cnt);
+		sprintf(fname, "%.12s.%lu.sav", nds->gameTitle, cnt);
 		while (FtpSize(fname, &tsize, FTPLIB_IMAGE, buf) != 0) {
 			displayMessage2F(STR_HW_SEEK_UNUSED_FNAME, fname);
 			if (cnt < 65536)
@@ -842,7 +845,7 @@ void hwBackupFTP(bool dlp)
 				displayWarning2F(STR_ERR_NO_FNAME);
 				while(1);
 			}
-			sprintf(fname, "%.12s.%lu.sav", nds.gameTitle, cnt);
+			sprintf(fname, "%.12s.%lu.sav", nds->gameTitle, cnt);
 		}
 	}
 	displayMessage2F(STR_HW_WRITE_FILE, fname);
