@@ -52,7 +52,8 @@
 #include "strings.h"
 #include "dsi.h"
 
-using namespace std;
+using std::min;
+using std::max;
 
 static u32 pitch = 0x40000;
 
