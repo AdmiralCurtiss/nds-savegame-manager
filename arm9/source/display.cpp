@@ -104,9 +104,10 @@ void displayPrintUpper(bool fc)
 	consoleClear();
 	
 	// fetch cartridge header (maybe, calling "cardReadHeader" on a FC messes with libfat!)
-	sNDSHeader nds;
+	u8 header[512] = {0};
+	sNDSHeader* nds = (sNDSHeader*)header;
 	if (!fc && (slot_1_type != AUXSPI_FLASH_CARD))
-		cardReadHeader((uint8*)&nds);
+		cardReadHeader(header);
 	else
 		slot_1_type = AUXSPI_FLASH_CARD;
 	
@@ -152,7 +153,7 @@ void displayPrintUpper(bool fc)
 	if (slot_1_type == AUXSPI_FLASH_CARD) {
 		sprintf(&name[0], "Flash Card");
 	} else {
-		memcpy(&name[0], &nds.gameCode[0], 4);
+		memcpy(&name[0], &nds->gameCode[0], 4);
 		name[4] = 0x00;
 	}
 	if (dstype == 1)
@@ -166,7 +167,7 @@ void displayPrintUpper(bool fc)
 	if (slot_1_type == AUXSPI_FLASH_CARD) {
 		sprintf(&name[0], "Flash Card");
 	} else {
-		memcpy(&name[0], &nds.gameTitle[0], 12);
+		memcpy(&name[0], &nds->gameTitle[0], 12);
 		name[12] = 0x00;
 	}
 	if (dstype == 1)
